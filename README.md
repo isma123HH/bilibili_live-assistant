@@ -1,7 +1,7 @@
 <p style="font-size:12px" align="center">假装这是logo</p>
 <h1 align="center" dir="auto">哔哩哔哩直播小工具</h1>
 <p align="center" dir="auto">
-  <a><img src="https://img.shields.io/github/stars/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/forks/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/issues/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/license/isma123HH/bilibili_live-assistant.svg"></img></a>
+  <a><img src="https://raster.shields.io/github/stars/isma123HH/bilibili_live-assistant.png"></img></a> <img src="https://img.shields.io/github/forks/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/issues/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/license/isma123HH/bilibili_live-assistant.svg"></img>
 </p>
 <p align="center" dir="auto">
   <a href="#介绍">脚本介绍</a>
