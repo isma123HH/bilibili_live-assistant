@@ -4,13 +4,9 @@
   <a><img src="https://raster.shields.io/github/stars/isma123HH/bilibili_live-assistant.png"></img></a> <img src="https://img.shields.io/github/forks/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/issues/isma123HH/bilibili_live-assistant.svg"></img> <img src="https://img.shields.io/github/license/isma123HH/bilibili_live-assistant.svg"></img>
 </p>
 <p align="center" dir="auto">
-  <a href="#介绍">脚本介绍</a>
-  <br>
   <a href="#功能介绍">功能介绍</a>
   <br>
   <a href="#功能展示">功能展示</a>
-  <br>
-  <a href="#教程">安装教程</a>
 </p>
 
 # 介绍
