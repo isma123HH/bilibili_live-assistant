@@ -13,7 +13,7 @@
 // @grant        unsafeWindow
 // @require      https://cdn.jsdelivr.net/npm/sweetalert2@11
 // @require      https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js
-// @require      https://vjs.zencdn.net/7.19.2/video.min.js
+// @require      https://unpkg.com/video.js/dist/video.min.js
 // ==/UserScript==
 
 (function () {
