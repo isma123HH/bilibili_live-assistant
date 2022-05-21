@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.5
+// @version      2.5.3
 // @description  一个辅助观看B站直播的小工具
 // @author       isma
 // @license      MIT
@@ -13,6 +13,7 @@
 // @grant        unsafeWindow
 // @require      https://cdn.jsdelivr.net/npm/sweetalert2@11
 // @require      https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js
+// @require      https://vjs.zencdn.net/7.19.2/video.min.js
 // ==/UserScript==
 
 (function () {
@@ -72,6 +73,7 @@
     var room_site = null;
     var room_init_res = null;
     var NAMESPACE = 'bilibili-kill_dm'
+    var bili_video_id = null;
     init()
     function init() {
         room_id = window.location.pathname
@@ -89,14 +91,22 @@
     no_watermark.remove()
     let follow_ctnr = $('.follow-ctnr')
     follow_ctnr[0].insertBefore($(htmls.LIVE__MENU_INJECT)[0], $('.follow-ctnr .left-part')[0])
+    document.querySelector('.live-player-mounter').childNodes.forEach(function (item, index) { // 这段是获取播放器的id,方便对播放器进行操作
+        console.log(item.id); // 其实应该放在一开始的,但一开始的时候播放器还没加载好
+        if(item.id.indexOf('video') != -1){
+            bili_video_id = item.id
+        }
+    })
     var plugin_setting_menu = document.querySelector(ids.MENU__SETTING_ID)
     plugin_setting_menu.addEventListener('click', function () {
         var show_words = GM_getValue('ban_word');
         Swal.fire({
             title: '插件设置',
             showCancelButton: true,
+            showDenyButton: true,
             cancelButtonText: '退出',
             confirmButtonText: '屏蔽设置',
+            denyButtonText: 'm3u8播放器',
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
@@ -117,7 +127,7 @@
                             return '你需要输入至少一个屏蔽词!如果要清空关键词请点击下方"清空关键词"按钮!'
                         }
                     },
-                    allowOutsideClick: () => !Swal.isLoading()
+                    allowOutsideClick: () => !Swal.isLoading() // 说实话，这个有什么用我忘了
                 }).then((result) => {
                     GM_setValue('ban_word', result.value)
                     if (result.isConfirmed) {
@@ -148,6 +158,48 @@
                         })
                     }
                 });
+            }
+            if(result.isDenied){
+                Swal.fire({
+                    input: 'text', // 允许输入text,但没有任何检测
+                    inputLabel: '在下方粘贴m3u8直播流链接',
+                    confirmButtonText: '继续',
+                    inputValidator: (value) => {
+                        if (!value) {
+                            return '请输入直播流链接!'
+                        }
+                        if(value.indexOf(".m3u8") == -1){
+                            return '这个播放器只支持.m3u8的直播流呢...'
+                        }
+                    },
+                  }).then((result) => {
+                    if (result.isConfirmed) {
+                        console.log(document.getElementById(bili_video_id).muted)
+                        document.getElementById(bili_video_id).muted = true; // 对播放器静音
+                        Swal.fire({ // 在新的Swal窗口通过video.js来播放m3u8视频。并且在将要关闭时使用dispose()，也就是删除播放器的所有事件、元素，完美符合我们"重新创建标签"的需求
+                            heightAuto: false,
+                            showConfirmButton: false,
+                            width: 1280,
+                            html: // 这里就写html代码，其实我更想是找到swal窗口用innerHTML插入的，但我想库本身支持的方法更好，唯一的缺点就是换行需要+
+                            '<video id=video_run_m3u8 class="video-js vjs-default-skin" controlBar="true" autoplay="autoplay">' +
+                            '<source src="'+result.value+'" type="application/x-mpegURL">'+
+                            '</video>',
+                            showCloseButton: true, // 显示关闭框
+                            willClose: () =>{
+                                console.log('正在销毁播放器...')
+                                myvideo.dispose()
+                                document.getElementById(bili_video_id).muted = false; // 取消对播放器的静音
+                            },
+                        })
+                        const myvideo = videojs('video_run_m3u8', {
+                            bigPlayButton: false,
+                            textTrackDisplay: false,
+                            errorDisplay: false,
+                        }, function () {
+                            this.play()
+                        })
+                    }
+                  })
             }
         })
     })
@@ -199,10 +251,8 @@
         // 直播流300秒(5分钟)切片
         var right_click_menu_300s = document.querySelector(ids.RIGHT_MENU__CLICK_300S)
         right_click_menu_300s.addEventListener('click', function () {
-            ls_stream_link = null
             room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
             ls_stream_link = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra + '&tmshift=300'
-            console.log(room_init_res)
             copy_this(ls_stream_link)
             send_toast('success', '已复制直播流链接', '', 2000, 'top')
             document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -210,10 +260,8 @@
         // 直播流180秒(3分钟)切片
         var right_click_menu_180s = document.querySelector(ids.RIGHT_MENU__CLICK_180S)
         right_click_menu_180s.addEventListener('click', function () {
-            ls_stream_link = null
             room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
             ls_stream_link = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra + '&tmshift=180'
-            console.log(room_init_res)
             copy_this(ls_stream_link)
             send_toast('success', '已复制直播流链接', '', 2000, 'top')
             document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -221,10 +269,8 @@
         // 直播流60秒切片
         var right_click_menu_60s = document.querySelector(ids.RIGHT_MENU__CLICK_60S)
         right_click_menu_60s.addEventListener('click', function () {
-            ls_stream_link = null
             room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
             ls_stream_link = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra + '&tmshift=60'
-            console.log(room_init_res)
             copy_this(ls_stream_link)
             send_toast('success', '已复制直播流链接', '', 2000, 'top')
             document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -232,10 +278,8 @@
         // 直播流30秒切片
         var right_click_menu_30s = document.querySelector(ids.RIGHT_MENU__CLICK_30S)
         right_click_menu_30s.addEventListener('click', function () {
-            ls_stream_link = null
             room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
             ls_stream_link = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra + '&tmshift=30'
-            console.log(room_init_res)
             copy_this(ls_stream_link)
             send_toast('success', '已复制直播流链接', '', 2000, 'top')
             document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -243,10 +287,8 @@
         // 直播流15秒切片
         var right_click_menu_15s = document.querySelector(ids.RIGHT_MENU__CLICK_15S)
         right_click_menu_15s.addEventListener('click', function () {
-            ls_stream_link = null
             room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
             ls_stream_link = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra + '&tmshift=15'
-            console.log(room_init_res)
             copy_this(ls_stream_link)
             send_toast('success', '已复制直播流链接', '', 2000, 'top')
             document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -287,7 +329,7 @@
         }
     }
     // 观察变动
-    const wrapperObserver = new MutationObserver((mutationsList, observer) => {
+    const wrapperObserver = new MutationObserver((mutationsList) => {
 
         for (const mutation of mutationsList) {
 
