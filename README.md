@@ -1,4 +1,4 @@
-<p style="font-size:12px" align="center"><img src="https://i1.hdslb.com/bfs/live/83f48bf72165be6ed8d59ac249aec58e48360575.png" /><br><small>我喜欢这个logo</small></p>
+<p style="font-size:12px" align="center"><img src="https://i1.hdslb.com/bfs/live/83f48bf72165be6ed8d59ac249aec58e48360575.png" /></p>
 <h1 align="center" dir="auto">哔哩哔哩直播小工具</h1>
 <p align="center" dir="auto">
   <a><img src="https://img.shields.io/github/stars/isma123HH/bilibili_live-assistant.svg"></img></a> 
