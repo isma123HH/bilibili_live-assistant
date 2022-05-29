@@ -64,8 +64,8 @@
 - [x] <del>在直播间页面弹出新窗口(插件设置那种的窗口)显示直播回放流。已放弃</del><br><b>已在脚本的2.5.3版本更新</b> 最后推荐一个在线网站http://tool.liumingye.cn/m3u8/index.php
 - [x] <del>将"m3u8播放器"使用的video.js更换为xgplayer.js。也就是<a href=https://v2.h5player.bytedance.com/>西瓜播放器</a>，但我正在忙另一个项目，大概会在3天后更新吧</del><br><b>已在2.6.0版本更新</b>
 - [x] <del>"插件设置"更名为"插件菜单"，以及"m3u8播放器"更名为"直播流播放器"。同时"直播流播放器"将<b>同时支持m3u8直播流和flv直播流的播放</b></del><br><b>已在2.6.3版本更新</b>
-- [x] <del>支持连接当前直播间的wss，api详见<a href=https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/live/message_stream.md>这里</a> <a href=https://github.com/SocialSisterYi/bilibili-API-collect/issues/360>还有这里</a></del><br><b>将在2.7.0版本更新</b>
-- [x] <del>新增一个"统计数据"的按钮，用来存放各种数据。</del> 
+- [x] <del>支持连接当前直播间的wss，api详见<a href=https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/live/message_stream.md>这里</a> <a href=https://github.com/SocialSisterYi/bilibili-API-collect/issues/360>还有这里</a></del><br><b>将在2.7.0版本更新</b> 如果"直播切片"代表脚本进入了一个新时代，那这次更新代表脚本又要进入一个新时代
+- [x] <del>新增一个"统计数据"的按钮，用来存放各种数据。</del> <br><b>将在2.7.0版本更新</b>
 
 # 目前的问题
 - [ ] 脚本加载成功后会有提示，可能会在导致提示"恭喜主播登上热门榜"的窗口里仍然显示一次提示(该窗口太小会导致排版错乱，极其影响观看体验)
