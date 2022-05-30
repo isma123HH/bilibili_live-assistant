@@ -20,7 +20,7 @@
 本项目初衷是做一个直播弹幕根据屏蔽词来屏蔽内容，发现B站做过后本应直接废弃掉，但由于在发现之前加入了不少小功能，所以我仍然决定保留并开源。大家当一个小功能脚本用就好了<br>
 <b>注意!本脚本的源码包括但不限于存在以下要素：无用的变量、重复的代码、令人高血压的换行</b><br>
 <b>如果您对此脚本有什么想法/意见/功能建议，请新建一个Issues！如果您想对本脚本作出贡献，可以新建一个Pull requests！我会定期查看的。</b>
-<b>小提示：本脚本已支持Acfun的直播流获取</b>
+<b>小提示：本脚本已支持<a href=https://live.acfun.cn/>Acfun</a>以及<a href=https://live.douyin.com/>抖音</a>的直播流获取</b>
 # 教程
 请确认浏览器已经安装<a href="https://www.tampermonkey.net/">油猴脚本</a>后<br>
 <a href="https://github.com/isma123HH/bilibili_live-assistant/raw/main/build/bili_live_assistant.user.js">点我安装脚本</a> 或者前往releases自行下载导入油猴
@@ -68,6 +68,7 @@
 - [x] <del>支持连接当前直播间的wss，api详见<a href=https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/live/message_stream.md>这里</a> <a href=https://github.com/SocialSisterYi/bilibili-API-collect/issues/360>还有这里</a></del><br><b>将在2.7.0版本更新</b> 如果"直播切片"代表脚本进入了一个新时代，那这次更新代表脚本又要进入一个新时代
 - [x] <del>新增一个"统计数据"的按钮，用来存放各种数据。</del> <br><b>将在2.7.0版本更新</b>
 - [x] <del>支持<a href=https://live.acfun.cn/>Acfun</a>的直播流获取，同样是右键播放器点击"获取直播流"。<br><b>将在...2.7.0版本更新，我写这个的时候忘了发布2.7.0，所以只能带着B站wss连接更新了</b></del> 
+- [x] <del>支持<a href=https://live.douyin.com/>抖音</a>的直播流获取，但不同的是需要在"手机观看"按钮旁边的<img src="assets/QQ截图20220530232439.png"/>里面找到直播流获取。</del><br><b>依然是将在2.7.0版本更新</b>
 - [ ] 陆续支持Acfun、抖音、虎牙、斗鱼等等直播平台
 
 # 目前的问题
