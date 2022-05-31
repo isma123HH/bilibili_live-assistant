@@ -1,5 +1,5 @@
 <p style="font-size:12px" align="center"><img src="https://i1.hdslb.com/bfs/live/83f48bf72165be6ed8d59ac249aec58e48360575.png" /></p>
-<h1 align="center" dir="auto">哔哩哔哩?以及Acfun！直播小工具</h1>
+<h1 align="center" dir="auto"><del>不止哔哩哔哩</del>直播小工具</h1>
 <p align="center" dir="auto">
   <a><img src="https://img.shields.io/github/stars/isma123HH/bilibili_live-assistant.svg"></img></a> 
   <img src="https://img.shields.io/github/forks/isma123HH/bilibili_live-assistant.svg"></img> 
@@ -85,4 +85,5 @@
 <li>2022/5/21 23:37 更新脚本至2.5.4。更新内容：优化了一些代码，以及删除了"删除进入直播间提示"功能</li>
 <li>2022/5/24 21:13 更新脚本至2.6.0。更新内容："m3u8播放器"原先使用video.js，在本次更新将使用<a href=https://v2.h5player.bytedance.com/>xgplayer</a>(西瓜播放器)</li>
 <li>2022/5/28 18:25 更新脚本至2.6.3。更新内容：将"插件设置"改名为"插件菜单"。"m3u8播放器"改名为"直播流播放器"，以及同时支持了flv和m3u8直播流链接的播放。并修复了在某些特殊的直播间不会启用脚本的错误。<del>（但仍然无法获取直播切片 但在2.7.0版本解决了）</del></li>
+<li>2022/5/31 14:53 更新脚本至2.7.0。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
 </ul>
