@@ -69,7 +69,8 @@
 - [x] <del>支持连接当前直播间的wss，api详见<a href=https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/live/message_stream.md>这里</a> <a href=https://github.com/SocialSisterYi/bilibili-API-collect/issues/360>还有这里</a></del><br><b>将在2.7.0版本更新</b> 如果"直播切片"代表脚本进入了一个新时代，那这次更新代表脚本又要进入一个新时代
 - [x] <del>新增一个"统计数据"的按钮，用来存放各种数据。</del> <br><b>将在2.7.0版本更新</b>
 - [x] <del>支持<a href=https://live.acfun.cn/>Acfun</a>的直播流获取，同样是右键播放器点击"获取直播流"。<br><b>将在...2.7.0版本更新，我写这个的时候忘了发布2.7.0，所以只能带着B站wss连接更新了</b></del> 
-- [x] <del>支持<a href=https://live.douyin.com/>抖音</a>的直播流获取，但不同的是需要在"手机观看"按钮旁边的<img src="assets/QQ截图20220530232439.png"/>里面找到直播流获取。</del><br><b>依然是将在2.7.0版本更新</b>
+- [x] <del>支持<a href=https://live.douyin.com/>抖音</a>的直播流获取，但不同的是需要在"手机观看"按钮旁边的<img src="assets/QQ截图20220530232439.png"/>里面找到直播流获取。</del><br><b>依然是在2.7.0版本更新</b>
+- [ ] 在Acfun做一个和B站一样的"插件菜单"。
 - [ ] 陆续支持Acfun、抖音、虎牙、斗鱼等等直播平台
 - [ ] 考虑更换"直播切片"菜单的接口。
 
