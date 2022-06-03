@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         B站直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.7.0
+// @version      2.7.3
 // @description  一个直播小工具，功能包括但不限于获取直播流、获取直播封面
+// @tips         v2.7.3:详细信息请前往github的Releases查看
 // @tips         v2.7.0:现已支持B站直播间wss连接，以及支持了Acfun的直播流获取
 // @author       isma
 // @license      MIT
@@ -14,11 +15,11 @@
 // @grant        GM_getValue
 // @grant        GM_listValues
 // @grant        unsafeWindow
-// @require      https://cdn.jsdelivr.net/npm/sweetalert2@11
-// @require      https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js
-// @require      https://cdn.jsdelivr.net/npm/xgplayer@2.31.2/browser/index.js
-// @require      https://cdn.jsdelivr.net/npm/xgplayer-hls.js@2.2.2/browser/index.js
-// @require      https://cdn.jsdelivr.net/npm/xgplayer-flv.js@2.1.2/browser/index.js
+// @require      https://unpkg.com/sweetalert2@11.4.17/dist/sweetalert2.all.js
+// @require      https://unpkg.com/jquery@3.2.1/dist/jquery.min.js
+// @require      https://unpkg.com/xgplayer@2.31.2/browser/index.js
+// @require      https://unpkg.com/xgplayer-hls.js@2.1.1/browser/index.js
+// @require      https://unpkg.com/xgplayer-flv.js@2.1.2/browser/index.js
 // @require      https://cdn.bootcss.com/pako/1.0.6/pako.min.js
 // ==/UserScript==
 
@@ -132,7 +133,8 @@
     function acfun_run(){
         const ids = {
             LIVE__MENU_ID: '#get_stream_link',
-            LIVE__COVER_ID: '#get_cover_link'
+            LIVE__COVER_ID: '#get_cover_link',
+            PLUGIN_MENU_ID: '#plugin_menu',
         }
         init_acfun()
         function mmsn_log(description,msg){
@@ -168,6 +170,7 @@
             )
         }
         var ac_room_id = null // 房间号
+        var acfun_video = null
         var anonymous_uid = null // 匿名id
         var NAMESPACE = 'acfun-live_tools' // 和B站相互对应
         var live_data = null
@@ -214,6 +217,98 @@
                 send_toast('success', '已复制直播流链接', '', 2000, 'top') 
             }) 
         }
+        window.setTimeout(function(){
+            $('.author-interactive-area')[0].insertBefore($('<div class="follow-up not-follow" id="plugin_menu"><div class="follow-status">我是</div> <div class="follow-count">插件菜单</div></div>')[0], $('.author-interactive-area .more-action')[0])
+            document.querySelector(ids.PLUGIN_MENU_ID).addEventListener('click', function () {
+                Swal.fire({
+                    title: '插件菜单',
+                    showConfirmButton: false,
+                    showDenyButton: true,
+                    denyButtonText: '直播流播放器',
+                }).then((result) => {
+                    if(result.isDenied){
+                        let is_m3u8,is_flv = false;
+                        Swal.fire({
+                            title: '直播流播放',
+                            input: 'text', // 允许输入text,但没有任何原生检测
+                            inputLabel: '注意！播放器已经同时支持m3u8与flv播放！',
+                            inputPlaceholder: '在这里粘贴直播流链接',
+                            confirmButtonText: '继续',
+                            inputValidator: (value) => {
+                                if (!value) {
+                                    return '请输入直播流链接!'
+                                }
+                                if(value.indexOf(".m3u8") != -1){
+                                    is_m3u8 = true
+                                }
+                                if(value.indexOf(".flv") != -1){
+                                    is_flv = true
+                                }
+                                if(value.indexOf(".m3u8") != -1 & value.indexOf(".flv") != -1){
+                                    return '既有.m3u8又有.flv，你这个链接不对吧?'
+                                }
+                            },
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                var find_video_id = false
+                                try{
+                                    acfun_video = document.querySelector('.container-video').childNodes[1] // 播放器控件最后一个节点
+                                    acfun_video.muted = true; // 对播放器静音
+                                    find_video_id = true
+                                    console.log('正确的找到了acfun播放器')
+                                }
+                                catch{
+                                    find_video_id = false
+                                    console.log('无法获取acfun播放器')
+                                    console.log(find_video_id)
+                                }
+                                Swal.fire({ // 如果通过video.js来播放m3u8视频。请在将要关闭时使用dispose()，也就是删除播放器的所有事件、元素，完美符合我们"重新创建标签"的需求
+                                    showConfirmButton: false,
+                                    width: 1280,
+                                    html: // 这里就写html代码，其实我更想是找到swal窗口用innerHTML插入的，库本身支持的方法更好，唯一的缺点就是换行需要+
+                                    '<div id="video_run_m3u8"></div>',
+                                    showCloseButton: true, // 显示关闭框
+                                    willClose: () =>{
+                                        if(find_video_id == true){
+                                            acfun_video.muted = false; // 取消对B站播放器的静音
+                                            video_player.destroy(true)
+                                        }
+                                        if(find_video_id == false){
+                                            video_player.destroy(true)
+                                        }
+                                    },
+                                })
+                                var video_player = null
+                                if(is_m3u8 == true){
+                                    video_player = new HlsJsPlayer({
+                                        id:'video_run_m3u8',
+                                        url: result.value ,
+                                        isLive: true,
+                                        width: 1200,
+                                        height: 700,
+                                        autoplay: true,
+                                        pip: true,
+                                    })
+                                }
+                                else if(is_flv == true){
+                                    video_player = new FlvJsPlayer({
+                                        id:'video_run_m3u8',
+                                        url: result.value ,
+                                        isLive: true,
+                                        width: 1200,
+                                        height: 700,
+                                        autoplay: true,
+                                        pip: true,
+                                        hasVideo: true,
+                                        hasAudio: true,
+                                    })
+                                }
+                            }
+                        })
+                    }
+                })
+            })
+        },500)
     }
     function bilibili_run(){
         const ids = {
@@ -346,6 +441,11 @@
                 $('#bili_toast').remove()
             },time)
         }
+        function get_stream_link(type,quality){ // type可用:h5(hls),web(flv) quality:2流畅 3高清 4原画
+            $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&quality='+quality+'', function (data) {
+                return data.data.durl[0].url
+            })
+        }
         //初始化
         var ls_stream_link = null; // ls其实是60的意思，因为一开始切片只做了60秒的
         var ls_stream = null; // link和这个的区别就是没有&tmshift=xxx
@@ -367,6 +467,12 @@
         var ws_content = null; // wss连接，方便在任何地方调用
         var recon_wss = null
         var wss_re_second = 10
+        function get_stream_link(type,quality){ // type可用:h5(hls),web(flv) quality:2流畅 3高清 4原画
+            $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&quality='+quality+'', function (data) {
+                console.log(data.data.durl[0].url)
+                return data.data.durl[0].url
+            })
+        }
         init() // 运行初始化函数
         function init() {
             room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.bilibili.com/213 = /213
@@ -392,8 +498,7 @@
         };
         //菜单注入
         window.setTimeout(function () {
-            $('.web-player-icon-roomStatus').remove() // 删除"bilibili直播"水印
-            $('.follow-ctnr')[0].insertBefore($(htmls.LIVE__MENU_INJECT)[0], $('.follow-ctnr .left-part')[0]) // 将"直播菜单注入"
+            $('.follow-ctnr')[0].insertBefore($(htmls.LIVE__MENU_INJECT)[0], $('.follow-ctnr .left-part')[0]) // 将"直播菜单"注入
             $('.follow-ctnr')[0].insertBefore($(htmls.LIVE__TOTALS_MENU)[0], $('.follow-ctnr .left-part')[0]) // 将"数据统计"注入
             var high_people_show = '<div title="" '+data_v1+'="" '+data_v2+'="" class="live-skin-normal-a-text pointer not-hover" style="line-height: 16px;"><i '+data_v1+'="" style="font-size: 16px;"></i><span '+data_v1+'="" class="action-text v-middle" id="high_people" style="font-size: 12px;">高能榜占位</span></div>'
             $('.right-ctnr')[0].insertBefore($(high_people_show)[0],document.querySelector('.right-ctnr').childNodes[5]) // 注入高能榜
@@ -482,8 +587,18 @@
                             },
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                bili_video_id = document.querySelector('.live-player-mounter').lastChild.id // 播放器控件最后一个节点
-                                document.getElementById(bili_video_id).muted = true; // 对播放器静音
+                                var find_video_id = false
+                                try{
+                                    bili_video_id = document.querySelector('.live-player-mounter').lastChild.id // 播放器控件最后一个节点
+                                    document.getElementById(bili_video_id).muted = true; // 对播放器静音
+                                    find_video_id = true
+                                    console.log('正确的找到了bilibili播放器id')
+                                }
+                                catch{
+                                    find_video_id = false
+                                    console.log('无法获取bilibili播放器id')
+                                    console.log(find_video_id)
+                                }
                                 Swal.fire({ // 如果通过video.js来播放m3u8视频。请在将要关闭时使用dispose()，也就是删除播放器的所有事件、元素，完美符合我们"重新创建标签"的需求
                                     showConfirmButton: false,
                                     width: 1280,
@@ -491,21 +606,30 @@
                                     '<div id="video_run_m3u8"></div>',
                                     showCloseButton: true, // 显示关闭框
                                     willClose: () =>{
-                                        document.getElementById(bili_video_id).muted = false; // 取消对B站播放器的静音
+                                        if(find_video_id == true){
+                                            document.getElementById(bili_video_id).muted = false; // 取消对B站播放器的静音
+                                            video_player.destroy(true)
+                                        }
+                                        if(find_video_id == false){
+                                            video_player.destroy(true)
+                                        }
                                     },
                                 })
+                                var video_player = null
                                 if(is_m3u8 == true){
-                                    let myvideo = new HlsJsPlayer({
+                                    video_player = new HlsJsPlayer({
                                         id:'video_run_m3u8',
                                         url: result.value ,
+                                        isLive: true,
                                         width: 1200,
                                         height: 700,
                                         autoplay: true,
                                         pip: true,
+                                        definitionActive: 'hover',
                                     })
                                 }
                                 else if(is_flv == true){
-                                    let myvideo = new FlvJsPlayer({
+                                    video_player = new FlvJsPlayer({
                                         id:'video_run_m3u8',
                                         url: result.value ,
                                         isLive: true,
@@ -515,8 +639,48 @@
                                         pip: true,
                                         hasVideo: true,
                                         hasAudio: true,
+                                        definitionActive: 'hover',
                                     })
                                 }
+                                video_player.emit('resourceReady', [{name: '流畅', url: 'zanwei' }, {name: '高清', url: 'zanwei' },{name: '原画', url:'zanwei' }]);
+                                video_player.on('definitionChange',function(e){
+                                    console.log('点击了'+e.to)
+                                    if(e.to == '原画' & is_flv == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=4', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                    else if(e.to == '原画' & is_m3u8 == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&quality=4', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                    if(e.to == '流畅' & is_flv == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=2', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                    else if(e.to == '流畅' & is_m3u8 == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&quality=2', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                    if(e.to == '高清' & is_flv == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=3', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                    else if(e.to == '高清' & is_m3u8 == true){
+                                        $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&quality=3', function (data) {
+                                            video_player.src = data.data.durl[0].url
+                                        })
+                                    }
+                                })
+                                video_player.once('canplay',function(e){
+                                    console.log('视频可以播放')
+                                    document.querySelector('.xgplayer-definition').lastChild.setAttribute('style','left:0px')
+                                    document.querySelector('.xgplayer-definition').lastChild.innerText = '清晰度'
+                                })
                             }
                         })
                     }
@@ -585,14 +749,19 @@
                 console.log("当前用户uid:"+uid)
             }
             catch{
-                $.get('https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo?room_id='+room_id+'&protocol=0,1&format=0,1,2&codec=0,1',function(data){
-                    console.error('开始获取链接')
-                    console.log(data)
-                    room_init_res = data
-                    ls_stream = room_init_res.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra
-                    uid = Number(document.querySelector('.user-panel-ctnr').firstChild.href.split('https://space.bilibili.com/')[1])
-                })
-                console.log('获取房间初始信息出现错误')
+                uid = Number(document.querySelector('.user-panel-ctnr').firstChild.href.split('https://space.bilibili.com/')[1])
+                try{
+                    $.get('https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo?room_id='+room_id+'&protocol=0,1&format=0,1,2&codec=0,1',function(data){
+                        console.error('开始获取直播流链接')
+                        console.log(data)
+                        room_init_res = data
+                        ls_stream = room_init_res.data.playurl_info.playurl.stream[1].format[0].codec[0].url_info[0].host + room_init_res.data.playurl_info.playurl.stream[1].format[0].codec[0].base_url + room_init_res.data.playurl_info.playurl.stream[1].format[0].codec[0].url_info[0].extra
+                    })
+                }
+                catch{
+                    ls_stream = "无法获取到直播流"
+                    console.log('获取直播流时出现错误')
+                }
             }
             // 直播流300秒(5分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_300S).addEventListener('click', function () {
@@ -629,6 +798,9 @@
                 send_toast('success', '已复制直播流链接', '', 2000, 'top')
                 document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
+            $('.web-player-icon-roomStatus').remove()
+            var player_show_high_guy = '<div class="web-player-icon-high_guy_show" style="position: absolute; left: 10px; top: 10px; z-index: 2; pointer-events: none; width: 200px; height: 43px; opacity: 70; background: none;"> <span id="player_show_high-people"><font size=5>B站直播小工具加载成功啦</font></span> </div>'
+            $('.live-player-mounter')[0].insertBefore($(player_show_high_guy)[0], $('.web-player-controller-wrap')[0])
         }, 800);
         window.setTimeout(function wss_get() {
             data_v1 = document.querySelector('.right-ctnr').childNodes[2].getAttributeNames()[0] // data-v
@@ -677,7 +849,7 @@
                                             room_total.danmu_total++;
                                             if(element.info[2][0] == uid){
                                                 console.log('弹幕发送成功~')
-                                                var send_pos = document.querySelector('#chat-control-panel-vm').getBoundingClientRect()
+                                                var send_pos = document.querySelector('#chat-control-panel-vm').getBoundingClientRect()   
                                                 bili_toast('success',send_pos.left,send_pos.top,'你的弹幕发送成功了~',3000)
                                                 //var send_ok_toast = '<div id="bili_toast" class="link-toast success " style="left: '+send_pos.left+'px; top: '+send_pos.top+'px;"><span class="toast-text">弹幕发送成功~</span></div>'
                                             }
@@ -701,6 +873,7 @@
                                         case "ONLINE_RANK_COUNT": // 高能榜
                                             room_total.high_people = element.data.count
                                             document.querySelector(ids.LIVE_TOALS_SHOW_HIGH).innerHTML = '高能榜人数:'+room_total.high_people
+                                            document.querySelector('#player_show_high-people').innerText = '高能榜人数:'+room_total.high_people
                                             console.log('直播高能榜更新为'+element.data.count)
                                             break;
                                         case "INTERACT_WORD": // 进场事件为1，关注事件为2
@@ -716,7 +889,7 @@
                                             break;
                                         case "ROOM_BLOCK_MSG": // 禁言事件
                                             room_total.block_guys++;
-                                            send_toast('error', element.data.uname+'被禁言了，好可怜啊...', '', 1900, 'top-end')
+                                            send_toast('error', element.data.uname+'被禁言了，好可怜啊...', '', 2500, 'top-end')
                                             break;
                                     }
                                 }
@@ -758,7 +931,12 @@
                     send_time_show = '<span id="time_menu" style="color:#00D1F1;"><br>'+dm_send_time+'</span>' // 时间戳显示
                     $(send_time_show).insertAfter(insert_here); // 附加上去
                 }
-                var ban_words = GM_getValue('ban_word').replace('/', '') // 获取屏蔽词
+                try{
+                    var ban_words = GM_getValue('ban_word').replace('/', '') // 获取屏蔽词
+                }
+                catch{
+                    var ban_words = '.'
+                }
                 let dm_content = wrapper.querySelector('.danmaku-content').innerHTML // 继续搜索danmaku-content，因为显示的文本在里面
                 for (var i = 0; i < ban_words.length; i++) { //循环
                     var ban_word = "/"+ban_words[i]+"/g"; // 希望你看得懂正则表达式
@@ -767,7 +945,12 @@
                 }
         }
         function show_dm_ban(wrapper){
-            var ban_words = GM_getValue('ban_word').replace('/', '') // 获取屏蔽词
+            try{
+                var ban_words = GM_getValue('ban_word').replace('/', '') // 获取屏蔽词
+            }
+            catch{
+                var ban_words = '.'
+            }
             let show_dm_content = wrapper.innerHTML // 获取显示的文本
             for (var i = 0; i < ban_words.length; i++) { //循环
                 var ban_word = "/"+ban_words[i]+"/g"; // 希望你看得懂正则表达式
@@ -802,6 +985,7 @@
               }
             }
           });
-          wrapperObserver.observe(document.body, { attributes: true, childList: true, subtree: true }); // 设置监听参数
+          // attributeFilter:['style'],attributeOldValue:true, 
+          wrapperObserver.observe(document.body, { attributes: true,childList: true, subtree: true }); // 设置监听参数
     }
 })();
