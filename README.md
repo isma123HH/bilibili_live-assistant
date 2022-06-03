@@ -88,4 +88,5 @@
 <li>2022/5/24 21:13 更新脚本至2.6.0。更新内容："m3u8播放器"原先使用video.js，在本次更新将使用<a href=https://v2.h5player.bytedance.com/>xgplayer</a>(西瓜播放器)</li>
 <li>2022/5/28 18:25 更新脚本至2.6.3。更新内容：将"插件设置"改名为"插件菜单"。"m3u8播放器"改名为"直播流播放器"，以及同时支持了flv和m3u8直播流链接的播放。并修复了在某些特殊的直播间不会启用脚本的错误。<del>（但仍然无法获取直播切片 但在2.7.0版本解决了）</del></li>
 <li>2022/5/31 14:53 更新脚本至2.7.0。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
+<li>2022/6/3 21:25 更新脚本至2.7.3。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
 </ul>
