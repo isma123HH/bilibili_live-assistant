@@ -1,8 +1,11 @@
 // ==UserScript==
 // @name         B站直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.7.3
+// @version      2.7.4
 // @description  一个直播小工具，功能包括但不限于获取直播流、获取直播封面
+// @tips         v2.7.4:更新了直播录制，位置：小功能->录制直播，停止录制同理
+// @waring-tips  v2.7.4的警告:录制时清晰度请勿选择"原画PRO" "超清PRO"等PRO清晰度，会导致无法录制。
+// @waring-tips  v2.7.4的警告:录制时不要静音播放器，或作出影响正常播放的行为。
 // @tips         v2.7.3:详细信息请前往github的Releases查看
 // @tips         v2.7.0:现已支持B站直播间wss连接，以及支持了Acfun的直播流获取
 // @author       isma
@@ -323,7 +326,8 @@
             RIGHT_MENU__CLICK_60S : '#right_click_menu_60s',
             RIGHT_MENU__CLICK_30S : '#right_click_menu_30s',
             RIGHT_MENU__CLICK_15S : '#right_click_menu_15s',
-            LIVE_TOALS_SHOW_HIGH: '#high_people'
+            LIVE_TOALS_SHOW_HIGH: '#high_people',
+            RIGHT_MENU__CLICK_REC_LIVE : '#right_click_menu_rec_live',
         }
         var room_total = {
             // 各种统计
@@ -434,7 +438,7 @@
         function mmsn_log(description,msg){
             console.log(`${NAMESPACE}: ${description}`, msg)
         }
-        function bili_toast(type,left,top,message,time){ // type可用:success、error、info
+        function bili_toast(type,left,top,message,time){ // type可用:success、error、info、caution
             var send_msg = '<div id="bili_toast" class="link-toast '+type+'" style="left:'+left+'px; top: '+top+'px;"><span class="toast-text">'+message+'</span></div>'
             $('body').append(send_msg)
             setTimeout(function(){
@@ -447,6 +451,7 @@
             })
         }
         //初始化
+        var is_rec = false
         var ls_stream_link = null; // ls其实是60的意思，因为一开始切片只做了60秒的
         var ls_stream = null; // link和这个的区别就是没有&tmshift=xxx
         var uid = null; // 当前用户uid
@@ -467,12 +472,6 @@
         var ws_content = null; // wss连接，方便在任何地方调用
         var recon_wss = null
         var wss_re_second = 10
-        function get_stream_link(type,quality){ // type可用:h5(hls),web(flv) quality:2流畅 3高清 4原画
-            $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&quality='+quality+'', function (data) {
-                console.log(data.data.durl[0].url)
-                return data.data.durl[0].url
-            })
-        }
         init() // 运行初始化函数
         function init() {
             room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.bilibili.com/213 = /213
@@ -608,10 +607,10 @@
                                     willClose: () =>{
                                         if(find_video_id == true){
                                             document.getElementById(bili_video_id).muted = false; // 取消对B站播放器的静音
-                                            video_player.destroy(true)
+                                            video_player.destroy(true) // 销毁播放器
                                         }
                                         if(find_video_id == false){
-                                            video_player.destroy(true)
+                                            video_player.destroy(true) // 销毁播放器
                                         }
                                     },
                                 })
@@ -625,7 +624,7 @@
                                         height: 700,
                                         autoplay: true,
                                         pip: true,
-                                        definitionActive: 'hover',
+                                        definitionActive: 'hover', // 设置清晰度需要悬停在按钮上才能修改
                                     })
                                 }
                                 else if(is_flv == true){
@@ -639,11 +638,11 @@
                                         pip: true,
                                         hasVideo: true,
                                         hasAudio: true,
-                                        definitionActive: 'hover',
+                                        definitionActive: 'hover', // 设置清晰度需要悬停在按钮上才能修改
                                     })
                                 }
                                 video_player.emit('resourceReady', [{name: '流畅', url: 'zanwei' }, {name: '高清', url: 'zanwei' },{name: '原画', url:'zanwei' }]);
-                                video_player.on('definitionChange',function(e){
+                                video_player.on('definitionChange',function(e){ // 监听清晰度更改
                                     console.log('点击了'+e.to)
                                     if(e.to == '原画' & is_flv == true){
                                         $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=4', function (data) {
@@ -676,7 +675,7 @@
                                         })
                                     }
                                 })
-                                video_player.once('canplay',function(e){
+                                video_player.once('canplay',function(e){ // 视频准备好之后就设置一下清晰度切换的样式
                                     console.log('视频可以播放')
                                     document.querySelector('.xgplayer-definition').lastChild.setAttribute('style','left:0px')
                                     document.querySelector('.xgplayer-definition').lastChild.innerText = '清晰度'
@@ -703,7 +702,7 @@
         window.setTimeout(function attack_player() {
             //注入部分
             rdm_id = $('.live-player-mounter')[0].childNodes[5].className.split('_')[2] // 获取随机的id,分割_得到随机id
-            var LIVE__PLAYER_MENU = '<li class="_context-menu-item_'+rdm_id+'"><span class="_context-menu-text_'+rdm_id+'">小功能</span><div class="_context-menu-right-arrow_'+rdm_id+'"></div><ul class="_context-sub-menu_'+rdm_id+'"><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink">获取m3u8直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink_flv">获取flv直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamcover">获取直播封面</li></ul></li>'
+            var LIVE__PLAYER_MENU = '<li class="_context-menu-item_'+rdm_id+'"><span class="_context-menu-text_'+rdm_id+'">小功能</span><div class="_context-menu-right-arrow_'+rdm_id+'"></div><ul class="_context-sub-menu_'+rdm_id+'"><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink">获取m3u8直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink_flv">获取flv直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamcover">获取直播封面</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_rec_live">录制直播</li></ul></li>'
             var LIVE__QC_MENU = '<li class="_context-menu-item_'+rdm_id+'"><span class="_context-menu-text_'+rdm_id+'">直播切片</span><div class="_context-menu-right-arrow_'+rdm_id+'"></div><ul class="_context-sub-menu_'+rdm_id+'"> <li class="_context-sub-menu-item_'+rdm_id+' _disabled_'+rdm_id+'">仅在某些直播间可用!</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_300s">300秒(5分钟)回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_180s">180秒(3分钟)回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_60s">60秒回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_30s">30秒回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_15s">15秒回放</li> </ul></li>'
             var inject_live_player_menu_here = $('._web-player-context-menu_'+rdm_id+'') // 这里就有必要声明一个变量了
             var inject_live_player_here = document.querySelectorAll('.live-player-mounter ._context-menu-item_'+rdm_id+'')[3]
@@ -763,6 +762,41 @@
                     console.log('获取直播流时出现错误')
                 }
             }
+            // 录制直播 已完成.
+            var mediaRecorder
+            var video_arr = []
+            document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).addEventListener('click', function () {
+                if(is_rec == true & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '停止录制' ){
+                    is_rec = false
+                    console.log('正在停止录制')
+                    document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '录制直播'
+                    mediaRecorder.stop()
+                    var web_m = new Blob(video_arr, { type: "video/webm;codecs=h264" });
+                    send_toast('success', '录制完毕', '1秒后自动跳转', 2000, 'top')
+                    document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                    setTimeout(()=> open(URL.createObjectURL(web_m)),1500);
+                }
+                else if(is_rec == false & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '录制直播' ){
+                    is_rec = true
+                    const stream = document.querySelector('.live-player-mounter').lastChild.captureStream()
+                    mediaRecorder = new MediaRecorder(stream,{
+                        mimeType: "video/webm;codecs=vp8"
+                    })
+                    video_arr = []
+                    new Promise((resolve, reject) => {
+                        mediaRecorder.onstop = resolve;
+                        mediaRecorder.onerror = reject;
+                        mediaRecorder.ondataavailable = (event) => {
+                            video_arr.push(event.data);
+                        }
+                        mediaRecorder.start(1);
+                    })                
+                    console.log('开始录制直播')
+                    document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '停止录制'
+                    send_toast('info', '正在录制直播', '不要给播放器静音，会导致录制的视频没有声音', 2500, 'top')
+                    document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                }
+            })
             // 直播流300秒(5分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_300S).addEventListener('click', function () {
                 ls_stream_link = ls_stream + '&tmshift=300'
@@ -937,11 +971,11 @@
                 catch{
                     var ban_words = '.'
                 }
-                let dm_content = wrapper.querySelector('.danmaku-content').innerHTML // 继续搜索danmaku-content，因为显示的文本在里面
+                let dm_content = wrapper.querySelector('.danmaku-content').innerText // 继续搜索danmaku-content，因为显示的文本在里面
                 for (var i = 0; i < ban_words.length; i++) { //循环
                     var ban_word = "/"+ban_words[i]+"/g"; // 希望你看得懂正则表达式
                     dm_content = dm_content.replace(eval(ban_word), '□') // 将屏蔽词替换为口
-                    wrapper.querySelector('.danmaku-content').innerHTML = dm_content // 覆盖原文本
+                    wrapper.querySelector('.danmaku-content').innerText = dm_content // 覆盖原文本
                 }
         }
         function show_dm_ban(wrapper){
@@ -951,11 +985,11 @@
             catch{
                 var ban_words = '.'
             }
-            let show_dm_content = wrapper.innerHTML // 获取显示的文本
+            let show_dm_content = wrapper.innerText // 获取显示的文本
             for (var i = 0; i < ban_words.length; i++) { //循环
                 var ban_word = "/"+ban_words[i]+"/g"; // 希望你看得懂正则表达式
                 show_dm_content = show_dm_content.replace(eval(ban_word), '□') // 将屏蔽词替换为口
-                wrapper.innerHTML = show_dm_content // 覆盖原文本
+                wrapper.innerText = show_dm_content // 覆盖原文本
             }
         }
         // 观察变动
