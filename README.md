@@ -100,5 +100,6 @@
 <li>2022/5/31 14:53 更新脚本至2.7.0。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
 <li>2022/6/3 21:25 更新脚本至2.7.3。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
 <li>2022/6/5 11:07 更新脚本至2.7.4。更新内容：添加了直播录制(bilibili)</li>
-<li>2022/6/5 23:53 更新脚本至2.7.5。更新内容：添加了直播录制(acfun)；现在直播录制后会使用xgplayer打开，而不是跳转到blob。因为blob需要在完整的看完之后才能下载视频。(bilibili以及acfun)</li>
+<li>2022/6/10 23:53 更新脚本至2.7.5。更新内容：添加了直播录制(acfun)；现在直播录制后会使用xgplayer打开，而不是跳转到blob。因为blob需要在完整的看完之后才能下载视频。(bilibili以及acfun)</li>
+<li>2022/7/4 00:08 更新脚本至2.7.6。更新内容：更新了打开super chat可以点击目标用户的用户名跳转到他的个人主页，修复了弹幕发送时间显示</li>
 </ul>
