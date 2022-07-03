@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         B站直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.7.4
+// @version      2.7.5
 // @description  一个直播小工具，功能包括但不限于获取直播流、获取直播封面
+// @tips         v2.7.5:更新了直播录制(acfun)，以及修改了录制完毕后的操作
 // @tips         v2.7.4:更新了直播录制，位置：小功能->录制直播，停止录制同理
 // @waring-tips  v2.7.4的警告:录制时清晰度请勿选择"原画PRO" "超清PRO"等PRO清晰度，会导致无法录制。
 // @waring-tips  v2.7.4的警告:录制时不要静音播放器，或作出影响正常播放的行为。
@@ -25,7 +26,7 @@
 // @require      https://unpkg.com/xgplayer-flv.js@2.1.2/browser/index.js
 // @require      https://cdn.bootcss.com/pako/1.0.6/pako.min.js
 // ==/UserScript==
-
+ 
 (function () {
     'use strict';
     // 函数
@@ -138,6 +139,7 @@
             LIVE__MENU_ID: '#get_stream_link',
             LIVE__COVER_ID: '#get_cover_link',
             PLUGIN_MENU_ID: '#plugin_menu',
+            LIVE__REC_ID: '#get_live_rec'
         }
         init_acfun()
         function mmsn_log(description,msg){
@@ -155,14 +157,13 @@
                     success:function(data){
                         anonymous_uid = data.userId
                         var visitor_st = data['acfun.api.visitor_st']
-                        var rmid = window.location.pathname.replace('/live/', '')
                         $.ajax(
                             {
                                 url:"https://api.kuaishouzt.com/rest/zt/live/web/startPlay?subBiz=mainApp&kpn=ACFUN_APP&kpf=PC_WEB&userId="+anonymous_uid+'&did=H5_&acfun.api.visitor_st='+visitor_st,
                                 type:'post',
                                 xhrFields:{ withCredentials: true },
                                 contentType:'application/x-www-form-urlencoded',
-                                data:'authorId=' + rmid + '&pullStreamType=FLV',
+                                data:'authorId=' + ac_room_id + '&pullStreamType=FLV',
                                 success:function(data){
                                     live_data = data
                                 }
@@ -172,11 +173,17 @@
                 }
             )
         }
-        var ac_room_id = null // 房间号
+        var ac_room_id // 房间号
         var acfun_video = null
         var anonymous_uid = null // 匿名id
         var NAMESPACE = 'acfun-live_tools' // 和B站相互对应
         var live_data = null
+        // 直播录制
+        var is_rec = false
+        var mediaRecorder
+        var video_arr = []
+        var rec_time_for
+        var rec_time_total = 0
         function init_acfun(){
             ac_room_id = window.location.pathname.replace('/live/', '') // 获取网址，例如 https://live.acfun.cn/live/38382871 = /live/38382871
             send_toast('success', 'html注入成功！享用脚本', '', 3000, 'top') 
@@ -198,6 +205,10 @@
             console.log('插入播放器')
             $('.context-menu')[0].insertBefore($('<li id="get_stream_link">获取直播流</li>')[0],document.querySelector('.context-menu').childNodes[6]);
             $('.context-menu')[0].insertBefore($('<li id="get_cover_link">获取直播封面</li>')[0],document.querySelector('.context-menu').childNodes[7]);
+            $('.context-menu')[0].insertBefore($('<li id="get_live_rec">录制直播</li>')[0],document.querySelector('.context-menu').childNodes[8]);
+            if(is_rec == true){
+                document.querySelector(ids.LIVE__REC_ID).innerText = '停止录制' // 更改按钮名
+            }
             // 直播封面
             document.querySelector(ids.LIVE__COVER_ID).addEventListener('click',function(){
                 Swal.fire({
@@ -219,7 +230,56 @@
                 copy_this(stlk_json.liveAdaptiveManifest[0].adaptationSet.representation[stlk_json.liveAdaptiveManifest[0].adaptationSet.representation.length -1].url)
                 send_toast('success', '已复制直播流链接', '', 2000, 'top') 
             }) 
+            // 录制直播
+            document.querySelector(ids.LIVE__REC_ID).addEventListener('click', function () {
+                if(is_rec == true & document.querySelector(ids.LIVE__REC_ID).innerText == '停止录制' ){
+                    is_rec = false;console.log('正在停止录制');document.querySelector(ids.LIVE__REC_ID).innerText = '录制直播' // 更改按钮名
+                    mediaRecorder.stop()
+                    var web_m = new Blob(video_arr, { type: "video/webm" }); // 新建Blob对象，类型为webm
+                    send_toast('success', '录制完毕', '共录制了'+rec_time_total+'秒,1秒后将自动跳转', 2000, 'top') 
+                    document.querySelector('#show_rec_time').remove();clearInterval(rec_time_for);rec_time_total = 0 // 各种销毁
+                    setTimeout(function(){
+                        Swal.fire({
+                            showConfirmButton: false,width: 1280,html:'<div id="video_run_rec"></div>',showCloseButton: true, // 显示关闭框
+                            willClose: () =>{
+                                video_player.destroy(true) // 销毁播放器
+                            },
+                        })
+                        var video_player = new Player({
+                            id:'video_run_rec',url: URL.createObjectURL(web_m) ,width: 1200,height: 700,autoplay: true,download: true,playbackRate: [0.5, 0.75, 1, 1.5, 2,5,10],defaultPlaybackRate: 1 // 注意的是也设置了倍数播放
+                        })
+                        // open(URL.createObjectURL(web_m))
+                    },1500);
+                }
+                else if(is_rec == false & document.querySelector(ids.LIVE__REC_ID).innerText == '录制直播' ){
+                    is_rec = true // 设置一下状态
+                    mediaRecorder = new MediaRecorder(document.querySelector('.container-video').childNodes[1].captureStream(),{
+                        mimeType: "video/webm;codecs=vp8" // 目前看来只支持webm
+                    })
+                    video_arr = [] // 新建数组
+                    new Promise((resolve, reject) => { // 监听将要发生的事件
+                        mediaRecorder.onstop = resolve;
+                        mediaRecorder.onerror = reject;
+                        mediaRecorder.ondataavailable = (event) => {
+                            video_arr.push(event.data); // 将数据存入数组
+                            // console.log(video_arr) // 未来的计划是video_arr.length > 5000的时候分组
+                        }
+                        mediaRecorder.start(1); // 不加1的话大概率不会成功运行
+                    })                
+                    setTimeout(function(){
+                        rec_time_for = setInterval(function(){ // 每隔1秒钟
+                            rec_time_total++ // 记录一下已录制的时长
+                            document.querySelector('#show_rec_time').innerText = '已经录制了' + rec_time_total + '秒' // 然后在播放器里面修改
+                        },1000)
+                    },1)
+                    document.querySelector(ids.LIVE__REC_ID).innerText = '停止录制' // 更改按钮名
+                    var rec_time_show = '<div class="share"> <span class="shareCount" id="show_rec_time">又是一个播放时间占位! By isma</span> </div>'
+                    $(rec_time_show).insertAfter($('.live-tips')[0]) // 1:播放器的显目提示 2.类似高能榜提醒的时间统计
+                    send_toast('info', '正在录制直播', '不要给播放器静音，会导致录制的视频没有声音 \n 以及也不要在录制时刷新，数据不会保存', 2500, 'top')
+                }
+            })
         }
+        // 直播菜单
         window.setTimeout(function(){
             $('.author-interactive-area')[0].insertBefore($('<div class="follow-up not-follow" id="plugin_menu"><div class="follow-status">我是</div> <div class="follow-count">插件菜单</div></div>')[0], $('.author-interactive-area .more-action')[0])
             document.querySelector(ids.PLUGIN_MENU_ID).addEventListener('click', function () {
@@ -449,7 +509,7 @@
             $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&quality='+quality+'', function (data) {
                 return data.data.durl[0].url
             })
-        }
+        }  
         //初始化
         var is_rec = false
         var ls_stream_link = null; // ls其实是60的意思，因为一开始切片只做了60秒的
@@ -470,14 +530,24 @@
         var load_time = null; // 加载好本脚本的时间戳
         var now_time = null; // 现在时间
         var ws_content = null; // wss连接，方便在任何地方调用
-        var recon_wss = null
-        var wss_re_second = 10
+        var recon_wss = null // 定时重连函数
+        var reconnect_second = 0 // 已重连次数
+        var wss_re_second = 10 // 要重连的次数
         init() // 运行初始化函数
         function init() {
             room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.bilibili.com/213 = /213
             if (room_id.indexOf('blanc') != -1) { // 如果有blanc
                 room_id = room_id.replace('/', '') // 那就继续解析!
-                room_id = room_id.replace('blanc', '') 
+                room_id = room_id.replace('blanc', '')
+            }
+            if(window.location.pathname.indexOf('blackboard') != -1){
+                console.log('不是一个正常的链接')
+                alert('本脚本不支持特殊的直播间，即将跳转至普通页面')
+                setTimeout(function(){
+                    console.log('not_normal_url')
+                    console.log(document.querySelector('#player-ctnr').firstChild.firstChild.src)
+                    window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
+                },1500)
             }
             try{
                 data_v = document.querySelector('.follow-ctnr .left-part').getAttributeNames()[0] // 获取data-v
@@ -644,7 +714,7 @@
                                 video_player.emit('resourceReady', [{name: '流畅', url: 'zanwei' }, {name: '高清', url: 'zanwei' },{name: '原画', url:'zanwei' }]);
                                 video_player.on('definitionChange',function(e){ // 监听清晰度更改
                                     console.log('点击了'+e.to)
-                                    if(e.to == '原画' & is_flv == true){
+                                    if(e.to == '原画' & is_flv == true){ // 监听更改并劫持修改
                                         $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=4', function (data) {
                                             video_player.src = data.data.durl[0].url
                                         })
@@ -765,75 +835,86 @@
             // 录制直播 已完成.
             var mediaRecorder
             var video_arr = []
+            var rec_time_for
+            var rec_time_total = 0
             document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).addEventListener('click', function () {
                 if(is_rec == true & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '停止录制' ){
-                    is_rec = false
-                    console.log('正在停止录制')
-                    document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '录制直播'
-                    mediaRecorder.stop()
-                    var web_m = new Blob(video_arr, { type: "video/webm;codecs=h264" });
-                    send_toast('success', '录制完毕', '1秒后自动跳转', 2000, 'top')
+                    is_rec = false;console.log('正在停止录制');document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '录制直播' // 更改按钮名
+                    mediaRecorder.stop();var web_m = new Blob(video_arr, { type: "video/webm" }); // 新建Blob对象，类型为webm
+                    send_toast('success', '录制完毕', '共录制了'+rec_time_total+'秒,1秒后将自动跳转', 2000, 'top') 
+                    document.querySelector('.web-player-icon-rec_now').remove();document.querySelector('#rec_time_show').remove();clearInterval(rec_time_for);rec_time_total = 0 // 各种销毁
                     document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
-                    setTimeout(()=> open(URL.createObjectURL(web_m)),1500);
+                    setTimeout(function(){
+                        Swal.fire({
+                            showConfirmButton: false,width: 1280,html:'<div id="video_run_rec"></div>',showCloseButton: true, // 显示关闭框
+                            willClose: () =>{
+                                video_player.destroy(true) // 销毁播放器
+                            },
+                        })
+                        var video_player = new Player({
+                            id:'video_run_rec',url: URL.createObjectURL(web_m) ,width: 1200,height: 700,autoplay: true,download: true,playbackRate: [0.5, 0.75, 1, 1.5, 2,5,10],defaultPlaybackRate: 1 // 注意的是也设置了倍数播放
+                        })
+                        // open(URL.createObjectURL(web_m))
+                    },1500);
                 }
                 else if(is_rec == false & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '录制直播' ){
-                    is_rec = true
-                    const stream = document.querySelector('.live-player-mounter').lastChild.captureStream()
-                    mediaRecorder = new MediaRecorder(stream,{
-                        mimeType: "video/webm;codecs=vp8"
+                    is_rec = true // 设置一下状态
+                    mediaRecorder = new MediaRecorder(document.querySelector('.live-player-mounter').lastChild.captureStream(),{
+                        mimeType: "video/webm;codecs=vp8" // 目前看来只支持webm
                     })
-                    video_arr = []
-                    new Promise((resolve, reject) => {
+                    video_arr = [] // 新建数组
+                    new Promise((resolve, reject) => { // 监听将要发生的事件
                         mediaRecorder.onstop = resolve;
                         mediaRecorder.onerror = reject;
                         mediaRecorder.ondataavailable = (event) => {
-                            video_arr.push(event.data);
+                            video_arr.push(event.data); // 将数据存入数组
+                            // console.log(video_arr) // 未来的计划是video_arr.length > 5000的时候分组
                         }
-                        mediaRecorder.start(1);
+                        mediaRecorder.start(1); // 不加1的话大概率不会成功运行
                     })                
+                    setTimeout(function(){
+                        rec_time_for = setInterval(function(){ // 每隔1秒钟
+                            rec_time_total++ // 记录一下已录制的时长
+                            document.querySelector('#show_rec_time').innerText = '已经录制了' + rec_time_total + '秒' // 然后在播放器里面修改
+                        },1000)
+                    },1)
                     console.log('开始录制直播')
-                    document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '停止录制'
-                    send_toast('info', '正在录制直播', '不要给播放器静音，会导致录制的视频没有声音', 2500, 'top')
-                    document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                    document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '停止录制' // 更改按钮名
+                    var rec_now = '<div class="web-player-icon-rec_now" style="position: absolute; left: '+document.querySelector('.live-player-mounter').getBoundingClientRect().width/2+'px; top: 0px; z-index: 2; pointer-events: none; width: 150px; height: 35px; opacity: 100; background: none;"> <span id="player_show_rec_now" style="vertical-align: middle"><font size=3>正在录制</font></span> <svg viewBox="0 0 1024 1024" style="vertical-align: middle;color:#CC3300" xmlns="http://www.w3.org/2000/svg" data-v-78e17ca8="" width=20px height=20px><path fill="currentColor" d="M704 768V256H128v512h576zm64-416 192-96v512l-192-96v128a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32V224a32 32 0 0 1 32-32h640a32 32 0 0 1 32 32v128zm0 71.552v176.896l128 64V359.552l-128 64zM192 320h192v64H192v-64z"></path></svg></div>'
+                    var rec_time_show = '<div id="rec_time_show" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[1]+'="" class="dp-i-block info-section"><div '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" class="hot-rank-wrap"><div '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" class="hot-rank-text rank-desc"><span id="show_rec_time" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="">播放时间占位By isma</span></div></div></div>'
+                    $('.live-player-mounter')[0].insertBefore($(rec_now)[0], $('.web-player-controller-wrap')[0]);$(rec_time_show).insertAfter($('.upper-row .left-ctnr .dp-i-block')[0]) // 1:播放器的显目提示 2.类似高能榜提醒的时间统计
+                    send_toast('info', '正在录制直播', '不要给播放器静音，会导致录制的视频没有声音 \n 以及也不要在录制时刷新，数据不会保存', 2500, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
                 }
             })
             // 直播流300秒(5分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_300S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=300'
-                copy_this(ls_stream_link)
-                send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                ls_stream_link = ls_stream + '&tmshift=300';copy_this(ls_stream_link)
+                send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流180秒(3分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_180S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=180'
-                copy_this(ls_stream_link)
-                send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                ls_stream_link = ls_stream + '&tmshift=180';copy_this(ls_stream_link)
+                send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流60秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_60S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=60'
-                copy_this(ls_stream_link)
-                send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                ls_stream_link = ls_stream + '&tmshift=60';copy_this(ls_stream_link)
+                send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流30秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_30S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=30'
-                copy_this(ls_stream_link)
-                send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                ls_stream_link = ls_stream + '&tmshift=30';copy_this(ls_stream_link)
+                send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流15秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_15S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=15'
-                copy_this(ls_stream_link)
-                send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
+                ls_stream_link = ls_stream + '&tmshift=15';copy_this(ls_stream_link)
+                send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             $('.web-player-icon-roomStatus').remove()
             var player_show_high_guy = '<div class="web-player-icon-high_guy_show" style="position: absolute; left: 10px; top: 10px; z-index: 2; pointer-events: none; width: 200px; height: 43px; opacity: 70; background: none;"> <span id="player_show_high-people"><font size=5>B站直播小工具加载成功啦</font></span> </div>'
+            // <div class="web-player-round-title" style="z-index: 2; position: absolute; right: 20px; bottom: 20px; pointer-events: none; color: rgb(170, 170, 170); font-size: 14px;">BV1Di4y1N7LV-【直播录屏】3.7嘉然生日会 完整录屏-P1</div>
+            // 固定到右下角示例
             $('.live-player-mounter')[0].insertBefore($(player_show_high_guy)[0], $('.web-player-controller-wrap')[0])
         }, 800);
         window.setTimeout(function wss_get() {
@@ -842,12 +923,12 @@
             $.get('https://api.live.bilibili.com/room/v1/Room/room_init?id='+room_id,function(rddata){ // 获取真实的房间号，因为有些房间是短号
                 rm_real_id = rddata.data.room_id // 有些房间是短号，还有长一点的id
                 $.get('https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?id=' + rm_real_id, function (data) {
-                    data.code == 0 // 判断一下返回结果
-                    ws_content = new WebSocket('wss://'+data.data.host_list[2].host + '/sub') // 这里还有有个host_list[0]可以用，但相关的事件信息会较少
-                    console.log('wss://'+data.data.host_list[2].host + '/sub') // 拼接一下ws连接
+                    ws_content = new WebSocket('wss://'+data.data.host_list[2].host + '/sub') // 这里还有有个host_list[0]可以用，但相关的事件信息会较少 以及拼接wss链接
                     ws_content.onopen = function(){ // 在ws连接成功后
-                        if (recon_wss != null)
-                            clearInterval(recon_wss);
+                        if (recon_wss != null) // 如果定时函数存在
+                            clearInterval(recon_wss); // 清除定时重连函数
+                            reconnect_second = 0 // 重新设置一下 已重连次数
+                            wss_re_second = 10 // 重新设置一下 要重连的次数
                         send_toast('success', '与wss服务器连接成功!', '', 3000, 'top')
                         console.log('连接wss成功') // 注意！必须要在5秒内发送正确的验证包，不然会被服务器断开wss连接
                         var auth_bag = {
@@ -930,22 +1011,20 @@
                     
                             }
                         });
-                        
                     }
                     ws_content.onclose = function(e){
                         console.log('断开了wss连接,错误代码'+e.code+'断开原因'+e.reason+' 是否正常断开'+e.wasClean)
                         send_toast('error', '断开了wss连接，正在尝试重连，请向脚本作者反馈！详细信息按f12查看', '', 3000, 'top')
                         if (timer != null)
-                            clearInterval(timer); // 断开连接后把定时器清理掉
-                        var reconnect_second = 0
-                        var tips_pos = document.querySelector('.left-ctnr').getBoundingClientRect()
-                        recon_wss = setInterval(function() {
-                            if(e.wasClean == false & reconnect_second < wss_re_second){
-                                reconnect_second++
-                                var be_left_second =  wss_re_second-reconnect_second
-                                bili_toast('error',tips_pos.left,tips_pos.top+100,'正在尝试重连，剩余重试次数' + be_left_second ,1500)
-                                console.log('正在尝试重连，剩余重试次数' + be_left_second )
-                                wss_get()
+                            clearInterval(timer); // 断开连接后把 定时心跳 清理掉
+                        var tips_pos = document.querySelector('.left-ctnr').getBoundingClientRect() // 要显示的位置坐标
+                        recon_wss = setInterval(function() { // 设置每2秒循环
+                            if(e.wasClean == false & reconnect_second <= wss_re_second){ // 重连次数(wss_re_second)为10
+                                reconnect_second++ // 已重连次数增加
+                                var be_left_second =  wss_re_second - reconnect_second // 接下来要重试的次数是 总重连次数减去已重连次数
+                                bili_toast('error',tips_pos.left,tips_pos.top+100,'正在尝试重连，剩余重试次数' + be_left_second ,1500) // 发送一个提示
+                                console.log('正在尝试重连，剩余重试次数' + be_left_second ) // 打印一下
+                                wss_get() // 重新连接wss
                             }
                         }, 2000);
                     }
@@ -969,7 +1048,7 @@
                     var ban_words = GM_getValue('ban_word').replace('/', '') // 获取屏蔽词
                 }
                 catch{
-                    var ban_words = '.'
+                    var ban_words = '.' // 如果没有设置屏蔽词则设置为.
                 }
                 let dm_content = wrapper.querySelector('.danmaku-content').innerText // 继续搜索danmaku-content，因为显示的文本在里面
                 for (var i = 0; i < ban_words.length; i++) { //循环
@@ -1000,7 +1079,9 @@
                     //mmsn_log('非目标变更', item);
                   if (item.classList?.contains('chat-item')) { // 聊天框
                     //mmsn_log('目标变更', item);
-                    observeComments(item);
+                    if(item.querySelector('.danmaku-content') != null){
+                        observeComments(item);
+                    }
                   }
                   if(item.classList?.contains('mode-roll')) { // 弹幕
                       //mmsn_log('目标变更', item);
