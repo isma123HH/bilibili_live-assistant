@@ -1,8 +1,13 @@
 // ==UserScript==
 // @name         直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.7.8
+// @version      2.8.0
 // @description  一个直播小工具，功能包括但不限于获取直播流、获取直播封面
+// @TODO         开多了直播间疑似会影响网络（可能因为websocket）|并且似乎会占用大量的CPU/内存，不清楚是B站的问题还是脚本的问题。
+// @tips         v2.8.0:由于B站的限制，搜索api无法被调用，所以删除了点击sc进主页的功能，以及优化及修复了一堆大小问题
+// @tips         v2.8.0:替换了pako.js的cdn，并修复了多开直播间导致的网络问题
+// @tips         v2.7.9:修复一些时候无法连接ws服务器
+// @tips         v2.7.8:修复了一点小问题，以及新增心跳包统计（可以根据这个来推测观看时长，每30秒发送一次心跳包）
 // @tips         v2.7.6:新增舰长数统计，以及统计数据导出为json格式，并且添加了打开sc可以显示对应的人民币
 // @tips         v2.7.6:更新了打开super chat可以点击目标用户的用户名跳转到他的个人主页，以及修复了弹幕发送时间显示
 // @tips         v2.7.5:更新了直播录制(acfun)，以及修改了录制完毕后的操作
@@ -20,19 +25,36 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_listValues
-// @grant        unsafeWindow
 // @require      https://unpkg.com/sweetalert2@11.4.17/dist/sweetalert2.all.js
 // @require      https://unpkg.com/jquery@3.2.1/dist/jquery.min.js
 // @require      https://unpkg.com/xgplayer@2.31.2/browser/index.js
 // @require      https://unpkg.com/xgplayer-hls.js@2.1.1/browser/index.js
 // @require      https://unpkg.com/xgplayer-flv.js@2.1.2/browser/index.js
-// @require      https://cdn.bootcss.com/pako/1.0.6/pako.min.js
+// @require      https://unpkg.com/pako@2.0.4/dist/pako.min.js
 // @run-at       document-end
 // ==/UserScript==
 
-(function () {
+window.onload = function () { // 重构为加载时再进行各种操作
     'use strict';
-    // 函数
+    if(top.location != self.location){ 
+        return; // 防止在iframe中再加载
+    } 
+    class tools_log_class{ // 封装提示class
+        constructor() { 
+            console.warn("[live_tools]初始化class")
+        }
+        error(msg){
+            console.error("[live_tools_error]"+msg)
+        } 
+        normal(msg){
+            console.log("[live_tools]"+msg)
+        }
+        warn(msg){
+            console.warn("[live_tools_warn]"+msg)
+        }
+    }
+    var live_tools_log = new tools_log_class() // 初始化
+    // 全局通用函数
     function send_toast(icon, title, text, time, pos) { // 将提示封装成函数以便调用
         const Toast = Swal.mixin({
             toast: true,
@@ -50,9 +72,6 @@
             icon: icon,
             title: title,
         })
-    }
-    function copy_this(copy_content) { // 利于复制内容
-        navigator.clipboard.writeText(copy_content)
     }
     function timestamptotime(timestamp){ // 时间戳解析
         return new Date(parseInt(timestamp) * 1000).toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ");
@@ -76,15 +95,17 @@
         // 然后移除
         document.body.removeChild(eleLink);
     }
-    // 开始检测直播网站
-    if(window.location.host == 'live.acfun.cn'){
-        acfun_run()
-    }
-    if(window.location.host == 'live.bilibili.com'){
-        bilibili_run()
-    }
-    if(window.location.host == 'live.douyin.com'){
-        douyin_run()
+    // 检测网站
+    switch(window.location.host){
+        case 'live.acfun.cn':
+            acfun_run()
+            break;
+        case 'live.bilibili.com':
+            bilibili_run()
+            break;
+        case 'live.douyin.com':
+            douyin_run()
+            break;
     }
     function douyin_run(){
         init_douyin()
@@ -92,11 +113,7 @@
             LIVE__GET_STREAM_LINK_FLV: '#get_stream_link_flv',
             LIVE__GET_STREAM_LINK_MU: '#get_stream_link_mu'
         }
-        function mmsn_log(description,msg){
-            console.log(`${NAMESPACE}: ${description}`, msg)
-        }
         var dy_room_id // 储存一下抖音直播间id，方便以后使用
-        var NAMESPACE = 'douyin-live_tools'
         function init_douyin(){
             dy_room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.douyin.com/801196266504 = /801196266504
             send_toast('success', 'html注入成功！享用脚本', '', 3000, 'top') 
@@ -136,12 +153,12 @@
             var live_data = JSON.parse(decodeURIComponent(document.getElementById("RENDER_DATA").innerText));
             // flv
             document.querySelector(ids.LIVE__GET_STREAM_LINK_FLV).addEventListener('click', function () {
-                copy_this(live_data.initialState.roomStore.roomInfo.room.stream_url.flv_pull_url.FULL_HD1)
+                navigator.clipboard.writeText(live_data.initialState.roomStore.roomInfo.room.stream_url.flv_pull_url.FULL_HD1)
                 send_toast('success', '已复制直播流链接', '', 2000, 'top') 
             })
             // m3u8
             document.querySelector(ids.LIVE__GET_STREAM_LINK_MU).addEventListener('click', function () {
-                copy_this(live_data.initialState.roomStore.roomInfo.room.stream_url.hls_pull_url_map.FULL_HD1)
+                navigator.clipboard.writeText(live_data.initialState.roomStore.roomInfo.room.stream_url.hls_pull_url_map.FULL_HD1)
                 send_toast('success', '已复制直播流链接', '', 2000, 'top') 
             })
         }
@@ -154,9 +171,6 @@
             LIVE__REC_ID: '#get_live_rec'
         }
         init_acfun()
-        function mmsn_log(description,msg){
-            console.log(`${NAMESPACE}: ${description}`, msg)
-        }
         get_live_info()
         function get_live_info(){
             $.ajax(
@@ -188,7 +202,6 @@
         var ac_room_id // 房间号
         var acfun_video = null
         var anonymous_uid = null // 匿名id
-        var NAMESPACE = 'acfun-live_tools' // 和B站相互对应
         var live_data = null
         // 直播录制
         var is_rec = false
@@ -213,8 +226,7 @@
             }
         });
         wrapperObserver.observe(document.body, { attributes: true, childList: true, subtree: true }); // 设置监听参数
-        function attack_player_player(){
-            console.log('插入播放器')
+        function attack_player_player(){ // 由于acfun的播放器比较特殊，和B站不一样，没有打开菜单就没有div，所以监听打开事件再插入
             $('.context-menu')[0].insertBefore($('<li id="get_stream_link">获取直播流</li>')[0],document.querySelector('.context-menu').childNodes[6]);
             $('.context-menu')[0].insertBefore($('<li id="get_cover_link">获取直播封面</li>')[0],document.querySelector('.context-menu').childNodes[7]);
             $('.context-menu')[0].insertBefore($('<li id="get_live_rec">录制直播</li>')[0],document.querySelector('.context-menu').childNodes[8]);
@@ -230,7 +242,7 @@
                     confirmButtonText: '复制',
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        copy_this('https://ali2.a.kwimgs.com/bs2/ztlc/cover_'+live_data.data.liveId + '_raw.jpg')
+                        navigator.clipboard.writeText('https://ali2.a.kwimgs.com/bs2/ztlc/cover_'+live_data.data.liveId + '_raw.jpg')
                         send_toast('success', '已复制图片链接', '', 2000, 'top')
                     }
                 })
@@ -238,14 +250,13 @@
             // 直播流
             document.querySelector(ids.LIVE__MENU_ID).addEventListener('click', function () {
                 var stlk_json = JSON.parse(live_data.data.videoPlayRes) // stlk=stream link
-                console.log(stlk_json.liveAdaptiveManifest[0].adaptationSet.representation[stlk_json.liveAdaptiveManifest[0].adaptationSet.representation.length -1].url)
-                copy_this(stlk_json.liveAdaptiveManifest[0].adaptationSet.representation[stlk_json.liveAdaptiveManifest[0].adaptationSet.representation.length -1].url)
+                navigator.clipboard.writeText(stlk_json.liveAdaptiveManifest[0].adaptationSet.representation[stlk_json.liveAdaptiveManifest[0].adaptationSet.representation.length -1].url)
                 send_toast('success', '已复制直播流链接', '', 2000, 'top') 
             }) 
             // 录制直播
             document.querySelector(ids.LIVE__REC_ID).addEventListener('click', function () {
                 if(is_rec == true & document.querySelector(ids.LIVE__REC_ID).innerText == '停止录制' ){
-                    is_rec = false;console.log('正在停止录制');document.querySelector(ids.LIVE__REC_ID).innerText = '录制直播' // 更改按钮名
+                    is_rec = false;live_tools_log.warn('正在停止录制');document.querySelector(ids.LIVE__REC_ID).innerText = '录制直播' // 更改按钮名
                     mediaRecorder.stop()
                     var web_m = new Blob(video_arr, { type: "video/webm" }); // 新建Blob对象，类型为webm
                     send_toast('success', '录制完毕', '共录制了'+rec_time_total+'秒,1秒后将自动跳转', 2000, 'top') 
@@ -330,12 +341,9 @@
                                     acfun_video = document.querySelector('.container-video').childNodes[1] // 播放器控件最后一个节点
                                     acfun_video.muted = true; // 对播放器静音
                                     find_video_id = true
-                                    console.log('正确的找到了acfun播放器')
                                 }
                                 catch{
                                     find_video_id = false
-                                    console.log('无法获取acfun播放器')
-                                    console.log(find_video_id)
                                 }
                                 Swal.fire({ // 如果通过video.js来播放m3u8视频。请在将要关闭时使用dispose()，也就是删除播放器的所有事件、元素，完美符合我们"重新创建标签"的需求
                                     showConfirmButton: false,
@@ -503,9 +511,6 @@
             }
             reader.readAsArrayBuffer(blob);
         }
-        function mmsn_log(description,msg){
-            console.log(`${NAMESPACE}: ${description}`, msg)
-        }
         function bili_toast(type,left,top,message,time){ // type可用:success、error、info、caution
             var send_msg = '<div id="bili_toast" class="link-toast '+type+'" style="left:'+left+'px; top: '+top+'px;"><span class="toast-text">'+message+'</span></div>'
             $('body').append(send_msg)
@@ -521,55 +526,51 @@
         }  
         //初始化
         var is_rec = false
-        var ls_stream_link = null; // ls其实是60的意思，因为一开始切片只做了60秒的
-        var ls_stream = null; // link和这个的区别就是没有&tmshift=xxx
-        var uid = null; // 当前用户uid
+        var ls_stream = null; // 加上&tmshift=xxx可以看直播回放（单位秒）
+        var uid = null; // 用户uid
         var anchor = null; // 主播
         var anchor_uid = null; // 主播uid
         var room_id = null; // 房间号
-        var rm_real_id = null; // 真正的房间号，因为有些房间是短号
-        var rdm_id = null; // 随机id，运用在 _context-menu-item_ + rdm_id
+        var room_real_id = null; // 真正的房间号，因为有些房间是短号
+        var rdm_id = null; // 随机id，用在 _context-menu-item_ + rdm_id
         var room_title = null;
-        var room_site = null; // 用来请求直播流的site参数，但还没有必要写进去
         var room_init_res = null; // 房间初始化信息
-        var NAMESPACE = 'bilibili-live_tools' // 脚本命名空间
-        var bili_video_id = null; // video标签的id，方便对播放器进行操作
         var send_time_show = null; // 时间显示的html
         var data_v = null; // 一种data-v
-        // var data_v1 = null; // 第二种data-v，但和data_v2一起使用
+        // var data_v1 = null; // 第二种data-v，但和data_v2一起使用 没必要了所有就注释了
         // var data_v2 = null // 第二种data-v，和v1一起使用
-        var timer = null; // 将定时器声明为全局变量，因为在丢失wss连接后要清除定时器
+        var wss_timer = null; // 将定时器声明为全局变量，因为在丢失wss连接后要清除定时器
         var load_time = null; // 加载好本脚本的时间戳
         var now_time = null; // 现在时间
         var ws_content = null; // wss连接，方便在任何地方调用
         var recon_wss = null // 定时重连函数
         var reconnect_second = 0 // 已重连次数
         var wss_re_second = 10 // 要重连的次数
+
         get_room_id() // 运行初始化函数
         function get_room_id(){
+            if(window.location.pathname == '/'){ // 由于在主页也会加载，所以先判断一下pathname是不是/，如果是就代表在主页，不必进行其他操作，否则会损耗用户性能
+                return
+            }
             room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.bilibili.com/213 = /213
             if (room_id.indexOf('blanc') != -1) { // 如果有blanc
                 room_id = room_id.replace('/', '') // 那就继续解析!
                 room_id = room_id.replace('blanc', '')
             }
-            if(window.location.pathname.indexOf('blackboard') != -1){
-                setTimeout(function(){
+            if(document.querySelector('.t-background-image') != null){ // 观察于2022/9/14 似乎B站升级了，现在地址栏没有blackboard了，就用该方法判断是否特殊的直播间
+                setTimeout(function(){ // 想留在特殊页面也可以，注释掉这个if就行了，对功能没有影响，但控制台会输入一堆报错
                     window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
-                },1500)
+                },1000)
             }
-            if(document.querySelector('.t-background-image') != null){
-                setTimeout(function(){
-                    window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
-                },1500)
-            }
-            init()
+            init() // 继续初始化
+            wss_get() // websocket连接
         }
         function init() {
             try{
                 data_v = document.querySelector('.follow-ctnr .left-part').getAttributeNames()[0] // 获取data-v
             }
             catch{ 
-                // 在一些特殊的直播间会获取不到data-v，但如果想做一个正常的样式，data-v是必须存在的。
+                // 在一些特殊的直播间会获取不到data-v，但如果想做一个正常的样式，data-v是必须存在的。2022/9/14 大部分直播间没有该情况
                 setTimeout(function(){ // 我在LIVE__MENU_INJECT里内置了圆角边框和字体居中，如果没有data-v也能模仿其他按钮的样式
                     data_v = document.querySelector('.follow-ctnr').getAttributeNames()[0]
                     document.querySelector('#totals_menu').setAttribute(data_v,'');document.querySelector('#plugins_setting').setAttribute(data_v,'')
@@ -578,17 +579,24 @@
             }
             //注入
             load_time = time_stamp_ten(Date.now()) // 给加载时间复制
-            console.info(timestamptotime(load_time)+'时加载脚本')
+            live_tools_log.warn(timestamptotime(load_time)+'时加载脚本')
             send_toast('success', 'html注入成功！享用脚本', '', 3000, 'top') //调用示例 第一个参数是提示图标，可以在sweetalert2官网查询;第二个参数是标题;第三个参数是内容，不填则无;第四个参数是显示时间，毫秒为单位;第五个为显示位置，同样在sweetalert2官网查询。
         }
         const htmls = {
             LIVE__TOTALS_MENU: '<div id="totals_menu" '+data_v+'="" style="margin-right:5px;border-radius:5px;" role="button" aria-label="数据统计" title="点击打开数据统计菜单" class="left-part live-skin-highlight-bg live-skin-button-text dp-i-block pointer p-relative"><span '+data_v+'="" class="follow-text v-middle d-inline-block" style="text-align: center;line-height: 20px;">数据统计</span></div>',
             LIVE__MENU_INJECT: '<div id="plugins_setting" '+data_v+'="" style="margin-right:5px;border-radius:5px;" role="button" aria-label="插件菜单" title="点击打开插件菜单" class="left-part live-skin-highlight-bg live-skin-button-text dp-i-block pointer p-relative"><span '+data_v+'="" class="follow-text v-middle d-inline-block" style="text-align: center;line-height: 20px;">插件菜单</span></div>'
         };
-        //菜单注入
-        window.setTimeout(function () {
-            document.querySelector('.follow-ctnr').insertBefore($(htmls.LIVE__MENU_INJECT)[0], $('.follow-ctnr .left-part')[0]) // 将"直播菜单"注入
-            document.querySelector('.follow-ctnr').insertBefore($(htmls.LIVE__TOTALS_MENU)[0], $('.follow-ctnr .left-part')[0]) // 将"数据统计"注入
+        // 菜单注入
+        window.setTimeout(function bili_live_menu_inject() {
+            try{
+                document.querySelector('.follow-ctnr').insertBefore($(htmls.LIVE__MENU_INJECT)[0], $('.follow-ctnr .left-part')[0]) // 将"直播菜单"注入
+                document.querySelector('.follow-ctnr').insertBefore($(htmls.LIVE__TOTALS_MENU)[0], $('.follow-ctnr .left-part')[0]) // 将"数据统计"注入
+            }catch{
+                setTimeout(() => {
+                    bili_live_menu_inject()
+                },1000)
+                return
+            }
             // var high_people_show = '<div title="" '+data_v1+'="" '+data_v2+'="" class="live-skin-normal-a-text pointer not-hover" style="line-height: 16px;"><i '+data_v1+'="" style="font-size: 16px;"></i><span '+data_v1+'="" class="action-text v-middle" id="high_people" style="font-size: 12px;">高能榜占位</span></div>'
             // document.querySelector('.right-ctnr').insertBefore($(high_people_show)[0],document.querySelector('.right-ctnr').childNodes[5]) // 注入高能榜
             document.querySelector(ids.MENU__SETTING_ID).addEventListener('click', function () {
@@ -626,8 +634,7 @@
                             if (result.isConfirmed) {
                                 var find_video_id = false
                                 try{
-                                    bili_video_id = document.getElementsByTagName('video')[0].id // 播放器
-                                    document.getElementById(bili_video_id).muted = true; // 对播放器静音
+                                    document.querySelector('video').muted = true; // 对播放器静音
                                     find_video_id = true
                                 }
                                 catch{
@@ -641,7 +648,7 @@
                                     showCloseButton: true, // 显示关闭框
                                     willClose: () =>{
                                         if(find_video_id == true){
-                                            document.getElementById(bili_video_id).muted = false; // 取消对B站播放器的静音
+                                            document.querySelector('video').muted = false; // 取消对B站播放器的静音
                                             video_player.destroy(true) // 销毁播放器
                                         }
                                         if(find_video_id == false){
@@ -678,7 +685,6 @@
                                 }
                                 video_player.emit('resourceReady', [{name: '流畅', url: 'zanwei' }, {name: '高清', url: 'zanwei' },{name: '原画', url:'zanwei' }]);
                                 video_player.on('definitionChange',function(e){ // 监听清晰度更改
-                                    console.log('[bili_toast_video_tips]点击了'+e.to)
                                     if(e.to == '原画' & is_flv == true){ // 监听更改并劫持修改
                                         $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&quality=4', function (data) {
                                             video_player.src = data.data.durl[0].url
@@ -711,7 +717,6 @@
                                     }
                                 })
                                 video_player.once('canplay',function(e){ // 视频准备好之后就设置一下清晰度切换的样式
-                                    console.log('[bili_toast_video_tips]视频可以播放')
                                     document.querySelector('.xgplayer-definition').lastChild.setAttribute('style','left:0px')
                                     document.querySelector('.xgplayer-definition').lastChild.innerText = '清晰度'
                                 })
@@ -725,7 +730,7 @@
                 Swal.fire({
                     title: '<font size=5>' + timestamptotime(load_time) + '到<br>' + now_time +'的统计</font>',
                     html:
-                      '<h3>房间号'+room_id+'，主播:'+ anchor +'<br>' +
+                      '<h3>房间号'+room_id+'，真实房间号'+room_real_id+'，主播:'+ anchor +'<br>' +
                       '新增了' + room_total.follow_people + '个关注<br>有' + room_total.entry_people + '个普通用户和' + room_total.boat_guy_entry + '个大航海用户进入直播间<br>共新增了' + room_total.boat_add + '个大航海<br>已经接收了' + room_total.danmu_total + '条弹幕<br>'+'共收到' + room_total.pay_gift + '个付费礼物，价值' + room_total.silver/100 + '电池，等同于' + String(room_total.silver/100).slice(0,String(room_total.silver/100).length -1) + '人民币<br>共收到'+ room_total.free_gift + '个免费礼物，价值' + room_total.free_gift_silver + '银瓜子<br>共收到了' + room_total.super_chat_total + '条SuperChat,总价值' + room_total.super_chat_rmb + '人民币<br>共禁言了' + room_total.block_guys + '位用户<br>共发送了' + room_total.hearts + '个心跳包',
                     showCloseButton: true,
                     showCancelButton: true,
@@ -770,8 +775,9 @@
                     }
                 })
             })
+            attack_player()
         }, 800);
-        window.setTimeout(function attack_player() {
+        function attack_player() {
             // 获取一些东西
             try{
                 anchor = document.querySelector('.lower-row .left-ctnr').childNodes[1].text;
@@ -789,7 +795,14 @@
             }
             room_title = document.querySelector('.flex-wrap').firstChild.innerText
             // 注入部分
-            rdm_id = document.querySelector('.live-player-mounter').childNodes[5].className.split('_')[2] // 获取随机的id,分割_得到随机id
+            try{ 
+                rdm_id = document.querySelector('.live-player-mounter').childNodes[5].className.split('_')[2] // 获取随机的id,分割_得到id
+            }catch{ // 如果无法获取就在一秒后重试
+                setTimeout(() => {
+                    attack_player()
+                },1000)
+                return
+            }
             var LIVE__PLAYER_MENU = '<li class="_context-menu-item_'+rdm_id+'"><span class="_context-menu-text_'+rdm_id+'">小功能</span><div class="_context-menu-right-arrow_'+rdm_id+'"></div><ul class="_context-sub-menu_'+rdm_id+'"><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink">获取m3u8直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamlink_flv">获取flv直播流</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_getstreamcover">获取直播封面</li><li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_rec_live">录制直播</li></ul></li>'
             var LIVE__QC_MENU = '<li class="_context-menu-item_'+rdm_id+'"><span class="_context-menu-text_'+rdm_id+'">直播切片</span><div class="_context-menu-right-arrow_'+rdm_id+'"></div><ul class="_context-sub-menu_'+rdm_id+'"> <li class="_context-sub-menu-item_'+rdm_id+' _disabled_'+rdm_id+'">仅在某些直播间可用!</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_300s">300秒(5分钟)回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_180s">180秒(3分钟)回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_60s">60秒回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_30s">30秒回放</li> <li class="_context-sub-menu-item_'+rdm_id+'" id="right_click_menu_15s">15秒回放</li> </ul></li>'
             var inject_live_player_menu_here = $('._web-player-context-menu_'+rdm_id+'') // 这里就有必要声明一个变量了
@@ -799,7 +812,7 @@
             // 复制m3u8直播流链接
             document.querySelector(ids.RIGHT_MENU__CLICK_GET_STREAM_LINK_ID).addEventListener('click', function () {
                 $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5', function (data) {
-                    copy_this(data.data.durl[0].url)
+                    navigator.clipboard.writeText(data.data.durl[0].url)
                     send_toast('success', '已复制直播流链接', '', 2000, 'top')
                 })
                 document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -807,7 +820,7 @@
             // 复制flv直播流链接
             document.querySelector(ids.RIGHT_MENU__CLICK_GET_STREAM_LINK_FLV_ID).addEventListener('click', function () {
                 $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id, function (data) {
-                    copy_this(data.data.durl[0].url)
+                    navigator.clipboard.writeText(data.data.durl[0].url)
                     send_toast('success', '已复制直播流链接', '', 2000, 'top')
                 })
                 document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -822,7 +835,7 @@
                         confirmButtonText: '复制',
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            copy_this(data.data.user_cover)
+                            navigator.clipboard.writeText(data.data.user_cover)
                             send_toast('success', '已复制图片链接', '', 2000, 'top')
                         }
                     })
@@ -831,12 +844,16 @@
             });
             try{
                 room_init_res = JSON.parse(document.getElementsByClassName('script-requirement')[0].firstChild.innerHTML.replace(/window.__NEPTUNE_IS_MY_WAIFU__=/,''))
-                ls_stream = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra
+                try{ // 除chrome外的浏览器（例如edge）不支持fmp4，所以在这里会报错。
+                    ls_stream = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[1].codec[0].url_info[0].extra
+                }catch{
+                    ls_stream = room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[0].codec[0].url_info[0].host + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[0].codec[0].base_url + room_init_res.roomInitRes.data.playurl_info.playurl.stream[1].format[0].codec[0].url_info[0].extra
+                }
                 uid = room_init_res.userLabInfo.data.uid // 获取一下uid
-                console.log("当前用户uid:"+uid)
+                live_tools_log.normal("当前用户uid:"+uid)
             }
             catch{
-                console.error("[live_tools_error]无法获取到房间信息,直播切片功能将失效")
+                live_tools_log.error("无法获取到房间初始化信息")
                 uid = 0
                 $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&quality=4', function (data) {
                     ls_stream = data.data.durl[0].url
@@ -849,8 +866,9 @@
             var rec_time_total = 0
             document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).addEventListener('click', function () {
                 if(is_rec == true & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '停止录制' ){
-                    is_rec = false;console.log('正在停止录制');document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '录制直播' // 更改按钮名
+                    is_rec = false;live_tools_log.warn('正在停止录制');document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '录制直播' // 更改按钮名
                     mediaRecorder.stop();var web_m = new Blob(video_arr, { type: "video/webm" }); // 新建Blob对象，类型为webm
+                    mediaRecorder.release()
                     send_toast('success', '录制完毕', '共录制了'+rec_time_total+'秒,1秒后将自动跳转', 2000, 'top') 
                     document.querySelector('.web-player-icon-rec_now').remove();document.querySelector('#rec_time_show').remove();clearInterval(rec_time_for);rec_time_total = 0 // 各种销毁
                     document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
@@ -869,7 +887,8 @@
                 }
                 else if(is_rec == false & document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText == '录制直播' ){
                     is_rec = true // 设置一下状态
-                    mediaRecorder = new MediaRecorder(document.getElementsByTagName('video')[0].captureStream(),{
+                    var video_stream = document.getElementsByTagName('video')[0].captureStream()
+                    mediaRecorder = new MediaRecorder(video_stream,{
                         mimeType: "video/webm" // 目前看来只支持webm
                     })
                     video_arr = [] // 新建数组
@@ -888,7 +907,7 @@
                             document.querySelector('#show_rec_time').innerText = '已经录制了' + rec_time_total + '秒' // 然后在播放器里面修改
                         },1000)
                     },1)
-                    console.log('开始录制直播')
+                    live_tools_log.warn(now_time + '开始录制直播')
                     document.querySelector(ids.RIGHT_MENU__CLICK_REC_LIVE).innerText = '停止录制' // 更改按钮名
                     var rec_now = '<div class="web-player-icon-rec_now" style="position: absolute; left: '+document.querySelector('.live-player-mounter').getBoundingClientRect().width/2+'px; top: 0px; z-index: 2; pointer-events: none; width: 150px; height: 35px; opacity: 100; background: none;"> <span id="player_show_rec_now" style="vertical-align: middle"><font size=3>正在录制</font></span> <svg viewBox="0 0 1024 1024" style="vertical-align: middle;color:#CC3300" xmlns="http://www.w3.org/2000/svg" data-v-78e17ca8="" width=20px height=20px><path fill="currentColor" d="M704 768V256H128v512h576zm64-416 192-96v512l-192-96v128a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32V224a32 32 0 0 1 32-32h640a32 32 0 0 1 32 32v128zm0 71.552v176.896l128 64V359.552l-128 64zM192 320h192v64H192v-64z"></path></svg></div>'
                     var rec_time_show = '<div id="rec_time_show" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[1]+'="" class="dp-i-block info-section"><div '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" class="hot-rank-wrap"><div '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="" class="hot-rank-text rank-desc"><span id="show_rec_time" '+document.querySelector('.left-ctnr .dp-i-block').getAttributeNames()[0]+'="">播放时间占位By isma</span></div></div></div>'
@@ -898,27 +917,27 @@
             })
             // 直播流300秒(5分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_300S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=300';copy_this(ls_stream_link)
+                navigator.clipboard.writeText(ls_stream + '&tmshift=300')
                 send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流180秒(3分钟)切片
             document.querySelector(ids.RIGHT_MENU__CLICK_180S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=180';copy_this(ls_stream_link)
+                navigator.clipboard.writeText(ls_stream + '&tmshift=180')
                 send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流60秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_60S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=60';copy_this(ls_stream_link)
+                navigator.clipboard.writeText(ls_stream + '&tmshift=60')
                 send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流30秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_30S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=30';copy_this(ls_stream_link)
+                navigator.clipboard.writeText(ls_stream + '&tmshift=30')
                 send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 直播流15秒切片
             document.querySelector(ids.RIGHT_MENU__CLICK_15S).addEventListener('click', function () {
-                ls_stream_link = ls_stream + '&tmshift=15';copy_this(ls_stream_link)
+                navigator.clipboard.writeText(ls_stream + '&tmshift=15')
                 send_toast('success', '已复制直播流链接', '', 2000, 'top');document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             $('.web-player-icon-roomStatus').remove()
@@ -926,39 +945,38 @@
             // <div class="web-player-round-title" style="z-index: 2; position: absolute; right: 20px; bottom: 20px; pointer-events: none; color: rgb(170, 170, 170); font-size: 14px;">BV1Di4y1N7LV-【直播录屏】3.7嘉然生日会 完整录屏-P1</div>
             // 固定到右下角示例
             // $('.live-player-mounter')[0].insertBefore($(player_show_high_guy)[0], $('.web-player-controller-wrap')[0])
-        }, 800);
-        window.setTimeout(function wss_get() {
+        }
+        function wss_get() {
             // data_v1 = document.querySelector('.right-ctnr').childNodes[2].getAttributeNames()[0] // data-v
             // data_v2 = document.querySelector('.right-ctnr').childNodes[2].getAttributeNames()[1] // 也是data-v 
-            $.get('https://api.live.bilibili.com/room/v1/Room/room_init?id='+room_id,function(rddata){ // 获取真实的房间号，因为有些房间是短号
-                rm_real_id = rddata.data.room_id // 有些房间是短号，还有长一点的id
-                $.get('https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?id=' + rm_real_id, function (data) {
-                    ws_content = new WebSocket('wss://'+data.data.host_list[2].host + '/sub') // 这里还有有个host_list[0]可以用，但相关的事件信息会较少 以及拼接wss链接
+            $.get('https://api.live.bilibili.com/room/v1/Room/room_init?id='+room_id,function(rddata){ // 获取真实的房间号，因为有些房间是短号，而ws服务器是根据真实房间号来做广播的
+                    room_real_id = rddata.data.room_id // 有些房间是短号，还有长一点的id
+                    ws_content = new WebSocket('wss://broadcastlv.chat.bilibili.com/sub') //（不必了） 这里还有有个host_list[0]可以用，但相关的事件信息会较少 以及拼接wss链接
                     ws_content.onopen = function(){ // 在ws连接成功后
                         if (recon_wss != null) // 如果定时函数存在
                             clearInterval(recon_wss); // 清除定时重连函数
-                            reconnect_second = 0 // 重新设置一下 已重连次数
+                            reconnect_second = 0 // 重新设置一下 已重连次数 q
                             wss_re_second = 10 // 重新设置一下 要重连的次数
                         send_toast('success', '与wss服务器连接成功!', '', 3000, 'top')
-                        console.log('连接wss成功') // 注意！必须要在5秒内发送正确的验证包，不然会被服务器断开wss连接
+                        live_tools_log.warn(timestamptotime(time_stamp_ten(Date.now())) + '时连接websocket服务器成功') // 注意！必须要在5秒内发送正确的验证包，不然会被服务器断开wss连接
                         var auth_bag = {
                             "uid": uid, // 用户uid，非必要可不填
-                            'roomid': rm_real_id, // 房间id,必填参数
+                            'roomid': room_real_id, // 房间id,必填参数
                             'protover': 1, // 协议版本，我这里填1，填其他的或许会有错误吧
                             "platform": "web", // 播放平台
                             "clientver": "1.4.0", // 连接客户端版本
                         }
                         ws_content.send(getCertification(JSON.stringify(auth_bag)).buffer) // 发送请求，已经在getCertification处理好了，但我也看不懂
-                        timer = setInterval(function () { // 定时每30秒发送一次心跳包，不然会被服务端断开连接
+                        wss_timer = setInterval(function () { // 定时每30秒发送一次心跳包，不然会被服务端断开连接
                             var n1 = new ArrayBuffer(16) // 心跳包结构比较简单，直接写
                             var i = new DataView(n1);
-                                i.setUint32(0, 0),  //封包总大小
-                                i.setUint16(4, 16), //头部长度
-                                i.setUint16(6, 1), //协议版本
+                                i.setUint32(0, 0),  // 封包总大小
+                                i.setUint16(4, 16), // 头部长度
+                                i.setUint16(6, 1), // 协议版本
                                 i.setUint32(8, 2),  // 操作码，2为心跳包
-                                i.setUint32(12, 1); //就1
+                                i.setUint32(12, 1); // 就1
                             ws_content.send(i.buffer); //发送
-                            console.log(timestamptotime(time_stamp_ten(Date.now())) + '发送了一次心跳包')
+                            // live_tools_log.warn(timestamptotime(time_stamp_ten(Date.now())) + '发送了一次心跳包')
                             room_total.hearts++
                         }, 30000)   //30秒
                     }
@@ -980,7 +998,6 @@
                                             }
                                             break;
                                         case "ROOM_CHANGE": // 直播信息更改
-                                            console.log('直播信息更改了'+ element.data)
                                             break;
                                         case "SEND_GIFT": // 礼物事件
                                             if(element.data.coin_type != "silver"){
@@ -1001,7 +1018,7 @@
                                             // document.querySelector(ids.LIVE_TOALS_SHOW_HIGH).innerText = '高能榜人数:'+room_total.high_people
                                             // document.querySelector('#player_show_high-people').innerText = '高能榜人数:'+room_total.high_people
                                             document.querySelector(".tab-list").firstChild.innerText = '高能榜 共'+room_total.high_people+' 人'
-                                            console.log('直播高能榜更新为'+element.data.count)
+                                            // live_tools_log.normal(timestamptotime(time_stamp_ten(Date.now())) + ' 直播高能榜更新为'+element.data.count)
                                             break;
                                         case "INTERACT_WORD": // 进场事件为1，关注事件为2
                                             if(element.data.msg_type == 1){
@@ -1016,8 +1033,7 @@
                                             break;
                                         case "ROOM_BLOCK_MSG": // 禁言事件
                                             room_total.block_guys++;
-                                            send_toast('error', element.data.uname+'被禁言了，好可怜啊...', '', 2500, 'top-end')
-                                            console.log(element.data.uname + '被禁言了')
+                                            live_tools_log.error(element.data.uname + '被禁言了')
                                             break;
                                         case "GUARD_BUY":
                                             room_total.boat_add++;
@@ -1029,10 +1045,10 @@
                         });
                     }
                     ws_content.onclose = function(e){
-                        console.log('断开了wss连接,错误代码'+e.code+'断开原因'+e.reason+' 是否正常断开'+e.wasClean)
+                        live_tools_log.error('断开了wss连接,错误代码'+e.code+'断开原因'+e.reason+' 是否正常断开'+e.wasClean)
                         send_toast('error', '断开了wss连接，正在尝试重连，请向脚本作者反馈！详细信息按f12查看', '', 3000, 'top')
-                        if (timer != null)
-                            clearInterval(timer); // 断开连接后把 定时心跳 清理掉
+                        if (wss_timer != null)
+                            clearInterval(wss_timer); // 断开连接后把 定时心跳 清理掉
                         var tips_pos = document.querySelector('.left-ctnr').getBoundingClientRect() // 要显示的位置坐标
                         recon_wss = setInterval(function() { // 设置每2秒循环
                             if(e.wasClean == false & reconnect_second <= wss_re_second){ // 重连次数(wss_re_second)为10
@@ -1049,8 +1065,7 @@
                         }, 2000);
                     }
                 })
-            })
-        },800)
+        }
         // 变动后执行函数
         function dm_timeshow(wrapper) {
             var insert_here = wrapper.childNodes[1]
@@ -1075,32 +1090,13 @@
             }
         }
         function superchat_event(target){ 
-            try{
-                setTimeout(function (){ // 这里必须设置定时，如果不设置定时，设置属性的步骤会比获取target先执行
-                    target.querySelector('.name').setAttribute('id','go_sc_tp')
-                    target.querySelector('.name').innerText = target.querySelector('.name').innerText + ' 点击前往主页'
-                    var sc_price = target.querySelector('.price').innerText.split('电池')[0] // 10000
-                    var sc_price_rmb = sc_price.slice(0,sc_price.length -1) + '.00' // 1000 -> 1000.0
-                    target.querySelector('.price').innerText = sc_price + '电池 ' + sc_price_rmb + '人民币' // 10000电池 1000.0人民币
-                },100)
-            }
-            catch{
-                send_toast('error','出现错误啦！','点击用户名可能无法跳转至其个人主页，请重新打开SuperChat',1500,'top')
-            }
-            setTimeout(function (){ // 就像上面一样，不设置定时会导致无法获取到id，也就无法定位添加操作
-                document.querySelector('#go_sc_tp').addEventListener('click', function () { // 点击后才会通过搜索api找对应的用户，否则会消耗用户的性能以及有封禁的风险。
-                    try{
-                        $.get('https://api.bilibili.com/x/web-interface/search/type?&keyword='+ target.querySelector('.name').innerText.split(' ')[0] +'&search_type=bili_user', function (data) {
-                            window.open("https://space.bilibili.com/" + data.data.result[0].mid)
-                        })
-                    }
-                    catch{
-                        console.error("调用api时出错")
-                        console.error("详细错误信息:" + data)
-                        send_toast('error', 'get请求搜索用户时出错', '请检查控制台输入信息并反馈', 2500, 'top-end')
-                    }
-                });
-            },130)
+            setTimeout(function (){ // 这里必须设置定时，如果不设置定时，设置属性的步骤会比获取target先执行
+                target.querySelector('.name').setAttribute('id','go_sc_tp')
+                // target.querySelector('.name').innerText = target.querySelector('.name').innerText + ' 点击前往主页'
+                var sc_price = target.querySelector('.price').innerText.split('电池')[0] // 10000
+                var sc_price_rmb = sc_price.slice(0,sc_price.length -1) + '.00' // 1000 -> 1000.0
+                target.querySelector('.price').innerText = sc_price + '电池 ' + sc_price_rmb + '人民币' // 10000电池 1000.0人民币
+            },100)
         }
         // 观察变动
         const wrapperObserver = new MutationObserver((mutationsList) => { // 监听变动
@@ -1130,4 +1126,4 @@
           // attributeFilter:['style'],attributeOldValue:true, 
           wrapperObserver.observe(document.body, { attributes: true,childList: true, subtree: true }); // 设置监听参数
     }
-})();
+};
