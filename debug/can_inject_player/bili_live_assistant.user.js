@@ -812,7 +812,11 @@ window.onload = function () { // 重构为加载时再进行各种操作
                 inject_live_player_menu_here.insertBefore($(LIVE__PLAYER_MENU)[0],inject_live_player_here); // 向播放器注入"小功能"菜单
                 inject_live_player_menu_here.insertBefore($(LIVE__QC_MENU)[0],inject_live_player_here); // 向播放器注入"直播切片"菜单
             }catch{
-                console.log("WHAT")
+                console.log("尝试重新注入播放器")
+                setTimeout(() => {
+                    attack_player()
+                },1000)
+                return
             }
             // 复制m3u8直播流链接
             document.querySelector(ids.RIGHT_MENU__CLICK_GET_STREAM_LINK_ID).addEventListener('click', function () {
