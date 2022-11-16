@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         直播小工具
 // @namespace    https://github.com/isma123HH/bilibili_live-assistant
-// @version      2.8.0
+// @version      2.8.2
 // @description  一个直播小工具，功能包括但不限于获取直播流、获取直播封面
-// @TODO         开多了直播间疑似会影响网络（可能因为websocket）|并且似乎会占用大量的CPU/内存，不清楚是B站的问题还是脚本的问题。
+// @TODO         无
+// @tips         v2.8.2:删除了重连功能，因为在实际使用中根本没有任何的用，还会消耗性能。以及在获取直播流时添加了菜单，现在可以自选分辨率了
+// @tips         v2.8.1:新增删除B站专栏(https://*.bilibili.com/read/*)复制后带出处的功能。
 // @tips         v2.8.0:由于B站的限制，搜索api无法被调用，所以删除了点击sc进主页的功能，以及优化及修复了一堆大小问题
 // @tips         v2.8.0:替换了pako.js的cdn，并修复了多开直播间导致的网络问题
 // @tips         v2.7.9:修复一些时候无法连接ws服务器
@@ -19,13 +21,15 @@
 // @author       isma
 // @license      MIT
 // @match        https://live.bilibili.com/*
+// @match        https://*.bilibili.com/read/*
 // @match        https://live.acfun.cn/live/*
 // @match        https://live.douyin.com/*
 // @icon         https://i1.hdslb.com/bfs/live/83f48bf72165be6ed8d59ac249aec58e48360575.png
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_listValues
-// @require      https://unpkg.com/sweetalert2@11.4.17/dist/sweetalert2.all.js
+// @require      https://unpkg.com/sweetalert2@11.4.17/dist/sweetalert2.all.min.js
+// @require      https://unpkg.com/sweetalert@2.1.2/dist/sweetalert.min.js
 // @require      https://unpkg.com/jquery@3.2.1/dist/jquery.min.js
 // @require      https://unpkg.com/xgplayer@2.31.2/browser/index.js
 // @require      https://unpkg.com/xgplayer-hls.js@2.1.1/browser/index.js
@@ -106,6 +110,10 @@ window.onload = function () { // 重构为加载时再进行各种操作
         case 'live.douyin.com':
             douyin_run()
             break;
+        case 'www.bilibili.com':
+            if(window.location.pathname.indexOf('read') != -1){
+                bilibili_zhuanlan_run()
+            }
     }
     function douyin_run(){
         init_douyin()
@@ -384,6 +392,19 @@ window.onload = function () { // 重构为加载时再进行各种操作
         },500)
     }
     // *** 
+    // 哔哩哔哩专栏相关函数
+    // ***
+    function bilibili_zhuanlan_run() { // 所有人都恨附加信息！
+        // 因为专栏的主要内容在article-content内，并且B站的信息添加也是针对该元素的。
+        // 所以仅需阻止默认事件以及冒泡事件（不确定是否有效，先阻止就对了），最后再将选中的内容copy即可。
+        // 这里不用.toString()是因为会将html元素也一起复制，并且B站本身也不用.toString()进行复制。
+        document.querySelector('.article-content').addEventListener("copy",(e)=>{
+            e.preventDefault()
+            e.stopPropagation()
+            navigator.clipboard.writeText(window.getSelection())
+        })
+    }
+    // *** 
     // 哔哩哔哩相关函数
     // ***
     function bilibili_run(){
@@ -518,12 +539,14 @@ window.onload = function () { // 重构为加载时再进行各种操作
                 $('#bili_toast').remove()
             },time)
         }
-
-        function get_stream_link(type,quality){ // type可用:h5(hls,m3u8),web(flv) quality:2流畅 3高清 4原画
-            $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&quality='+quality+'', function (data) {
-                return data.data.durl[0].url
+        
+        function get_stream_link(type,qn){
+            return new Promise((res,rej) => { // type可用:h5(hls,m3u8),web(flv) qn: 80:流畅 150:高清 400:蓝光 10000:原画 20000:4K 30000:杜比
+                $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform='+type+'&qn='+qn+'', function (data) {
+                    res(data.data.durl[0].url)
+                })
             })
-        }  
+        }
         //初始化
         var is_rec = false
         var ls_stream = null; // 加上&tmshift=xxx可以看直播回放（单位秒）
@@ -543,25 +566,42 @@ window.onload = function () { // 重构为加载时再进行各种操作
         var load_time = null; // 加载好本脚本的时间戳
         var now_time = null; // 现在时间
         var ws_content = null; // wss连接，方便在任何地方调用
-        var recon_wss = null // 定时重连函数
-        var reconnect_second = 0 // 已重连次数
-        var wss_re_second = 10 // 要重连的次数
 
         get_room_id() // 运行初始化函数
         function get_room_id(){
             if(window.location.pathname == '/'){ // 由于在主页也会加载，所以先判断一下pathname是不是/，如果是就代表在主页，不必进行其他操作，否则会损耗用户性能
                 return
             }
-            room_id = window.location.pathname.replace('/', '') // 获取网址，例如 https://live.bilibili.com/213 = /213
+            room_id = window.location.pathname.replace('/', '') // 获取房间号，例如 https://live.bilibili.com/213 = /213 -> 213
             if (room_id.indexOf('blanc') != -1) { // 如果有blanc
                 room_id = room_id.replace('/', '') // 那就继续解析!
                 room_id = room_id.replace('blanc', '')
             }
-            if(document.querySelector('.t-background-image') != null){ // 观察于2022/9/14 似乎B站升级了，现在地址栏没有blackboard了，就用该方法判断是否特殊的直播间
-                setTimeout(function(){ // 想留在特殊页面也可以，注释掉这个if就行了，对功能没有影响，但控制台会输入一堆报错
+            if(window.location.pathname.indexOf('blackboard') != -1){
+                setTimeout(function(){
                     window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
+                },1500)
+            }
+            if(document.querySelector('.t-background-image') != null){ // 观察于2022/9/14 似乎B站升级了，现在地址栏没有blackboard了，就用该方法判断是否特殊的直播间
+                setTimeout(() => { // 想留在特殊页面也可以，注释掉这个if就行了，对功能没有影响，但控制台会输入一堆报错
+                    // 2022/9/23 根据本人观察，有些特殊直播间点进去后网址的房间号不变，但实际上显示的是其他直播间（例如22年的高能电玩节，点击进入C酱直播间，但实际上是“下班被游戏打”的直播间，也就是活动主办方。）
+                    // 所以在这里解析出播放器url，如果播放器url的roomid不是当前网址的roomid，则重新跳转。
+                    // 但我推测是bug，期待官方未来修复。
+                    window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
+                    // if(document.querySelector('#player-ctnr').firstChild.firstChild.src.split('/')[4].split('?')[0] != window.location.pathname.replace('/', '')){
+                    //     window.location.href = 'https://live.bilibili.com/blanc/' + window.location.pathname.replace('/', '')
+                    // }else{
+                    //     window.location.href = document.querySelector('#player-ctnr').firstChild.firstChild.src
+                    // }
+                    
                 },1000)
             }
+            setTimeout(() => {
+                if(document.querySelector('.kv-box') != null){
+                    console.log('https://live.bilibili.com/blanc/' + window.location.pathname.replace('/', ''))
+                    window.location.href = 'https://live.bilibili.com/blanc/' + window.location.pathname.replace('/', '')
+                }
+            },1500)
             init() // 继续初始化
             wss_get() // websocket连接
         }
@@ -809,20 +849,124 @@ window.onload = function () { // 重构为加载时再进行各种操作
             var inject_live_player_here = document.querySelectorAll('.live-player-mounter ._context-menu-item_'+rdm_id+'')[3]
             inject_live_player_menu_here[0].insertBefore($(LIVE__PLAYER_MENU)[0],inject_live_player_here); // 向播放器注入"小功能"菜单
             inject_live_player_menu_here[0].insertBefore($(LIVE__QC_MENU)[0],inject_live_player_here); // 向播放器注入"直播切片"菜单
-            // 复制m3u8直播流链接
+            // 复制m3u8直播流链接 // todo：修复问题
             document.querySelector(ids.RIGHT_MENU__CLICK_GET_STREAM_LINK_ID).addEventListener('click', function () {
-                $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5', function (data) {
-                    navigator.clipboard.writeText(data.data.durl[0].url)
-                    send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                })
+                // $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&ts='+time_stamp_ten(Date.now()), function (data) {
+                //     $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id + '&platform=h5&ts='+time_stamp_ten(Date.now()), function (data) {
+                //     console.log(data.data)
+                //     navigator.clipboard.writeText(data.data.durl[0].url)
+                //     send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                // })
+                swal("选择流分辨率", "点击按钮选择！","info", {
+                    buttons: {
+                        HD: {
+                            text: "高清",
+                            value: "HD",
+                        },
+                        // defeat: true,
+                        blue: {
+                            text: "蓝光",
+                            value: "blue",
+                        },
+                        original: {
+                            text: "原画",
+                            value: "original",
+                        },
+                        fourK: {
+                            text: "4K",
+                            value: "fourK",
+                        }
+                    },
+                }).then((value) => {
+                    switch (value) {
+                        case "HD":
+                            get_stream_link("h5","150").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "blue":
+                            get_stream_link("h5","400").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "original":
+                            get_stream_link("h5","10000").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "fourK":
+                            get_stream_link("h5","20000").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+                            // default:
+                            //     swal("安全离开！");
+                    }
+                });
                 document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 复制flv直播流链接
             document.querySelector(ids.RIGHT_MENU__CLICK_GET_STREAM_LINK_FLV_ID).addEventListener('click', function () {
-                $.get('https://api.live.bilibili.com/room/v1/Room/playUrl?cid=' + room_id, function (data) {
-                    navigator.clipboard.writeText(data.data.durl[0].url)
-                    send_toast('success', '已复制直播流链接', '', 2000, 'top')
-                })
+                swal("选择流分辨率", "点击按钮选择！","info", {
+                    buttons: {
+                        HD: {
+                            text: "高清",
+                            value: "HD",
+                        },
+                        // defeat: true,
+                        blue: {
+                            text: "蓝光",
+                            value: "blue",
+                        },
+                        original: {
+                            text: "原画",
+                            value: "original",
+                        },
+                        fourK: {
+                            text: "4K",
+                            value: "fourK",
+                        }
+                    },
+                }).then((value) => {
+                    switch (value) {
+                        case "HD":
+                            get_stream_link("web","150").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "blue":
+                            get_stream_link("web","400").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "original":
+                            get_stream_link("web","10000").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+
+                        case "fourK":
+                            get_stream_link("web","20000").then(res => {
+                                navigator.clipboard.writeText(res)
+                                send_toast('success', '已复制直播流链接', '', 2000, 'top')
+                            })
+                            break;
+                            // default:
+                            //     swal("安全离开！");
+                    }
+                });
                 document.getElementsByClassName('_web-player-context-menu_'+rdm_id+'')[0].setAttribute('style', 'opacity : 0;')
             });
             // 获取直播间封面
@@ -953,10 +1097,6 @@ window.onload = function () { // 重构为加载时再进行各种操作
                     room_real_id = rddata.data.room_id // 有些房间是短号，还有长一点的id
                     ws_content = new WebSocket('wss://broadcastlv.chat.bilibili.com/sub') //（不必了） 这里还有有个host_list[0]可以用，但相关的事件信息会较少 以及拼接wss链接
                     ws_content.onopen = function(){ // 在ws连接成功后
-                        if (recon_wss != null) // 如果定时函数存在
-                            clearInterval(recon_wss); // 清除定时重连函数
-                            reconnect_second = 0 // 重新设置一下 已重连次数 q
-                            wss_re_second = 10 // 重新设置一下 要重连的次数
                         send_toast('success', '与wss服务器连接成功!', '', 3000, 'top')
                         live_tools_log.warn(timestamptotime(time_stamp_ten(Date.now())) + '时连接websocket服务器成功') // 注意！必须要在5秒内发送正确的验证包，不然会被服务器断开wss连接
                         var auth_bag = {
@@ -1046,23 +1186,7 @@ window.onload = function () { // 重构为加载时再进行各种操作
                     }
                     ws_content.onclose = function(e){
                         live_tools_log.error('断开了wss连接,错误代码'+e.code+'断开原因'+e.reason+' 是否正常断开'+e.wasClean)
-                        send_toast('error', '断开了wss连接，正在尝试重连，请向脚本作者反馈！详细信息按f12查看', '', 3000, 'top')
-                        if (wss_timer != null)
-                            clearInterval(wss_timer); // 断开连接后把 定时心跳 清理掉
-                        var tips_pos = document.querySelector('.left-ctnr').getBoundingClientRect() // 要显示的位置坐标
-                        recon_wss = setInterval(function() { // 设置每2秒循环
-                            if(e.wasClean == false & reconnect_second <= wss_re_second){ // 重连次数(wss_re_second)为10
-                                reconnect_second++ // 已重连次数增加
-                                var be_left_second =  wss_re_second - reconnect_second // 接下来要重试的次数是 总重连次数减去已重连次数
-                                bili_toast('error',tips_pos.left,tips_pos.top+100,'正在尝试重连，剩余重试次数' + be_left_second ,1500) // 发送一个提示
-                                console.warn('正在尝试重连，剩余重试次数' + be_left_second ) // 打印一下
-                                wss_get() // 重新连接wss
-                            }
-                            if(reconnect_second == 10){
-                                clearInterval(recon_wss)
-                                bili_toast('error',tips_pos.left,tips_pos.top+100,'重连失败啦!' + be_left_second ,2000) // 发送一个提示
-                            }
-                        }, 2000);
+                        send_toast('error', '断开了wss连接，请刷新页面重连', '', 3000, 'top')
                     }
                 })
         }
