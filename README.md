@@ -1,4 +1,3 @@
-<p style="font-size:12px" align="center"><img src="https://i1.hdslb.com/bfs/live/83f48bf72165be6ed8d59ac249aec58e48360575.png" /></p>
 <h1 align="center" dir="auto"><del>不止哔哩哔哩</del>直播小工具</h1>
 <p align="center" dir="auto">
   <a><img src="https://img.shields.io/github/stars/isma123HH/bilibili_live-assistant.svg"></img></a> 
@@ -6,93 +5,7 @@
   <img src="https://img.shields.io/github/issues/isma123HH/bilibili_live-assistant.svg"></img> 
   <img src="https://img.shields.io/github/license/isma123HH/bilibili_live-assistant.svg"></img>
 </p>
-<p align="center" dir="auto">
-  <a href="#功能展示">功能展示</a>
-  <br>
-  <a href="#更新列表">更新记录</a>
-  <br>
-  <a href="#未来计划">未来计划</a>
-</p>
-
-# 介绍
-本项目初衷是做一个直播弹幕根据屏蔽词来屏蔽内容，发现B站做过后本应直接废弃掉，但由于在发现之前加入了不少小功能，所以我仍然决定保留并开源。大家当一个小功能脚本用就好了。<br>
-<b>如果您对此脚本有什么想法/意见/功能建议，请新建一个Issues！如果您想对本脚本作出贡献，可以新建一个Pull requests！我会定期查看的。</b><br>
-<b>小提示：本脚本已支持<a href=https://live.acfun.cn/>Acfun</a>以及<a href=https://live.douyin.com/>抖音</a>的直播流获取</b>
-# 教程
-请确认浏览器已经安装<a href="https://www.tampermonkey.net/">油猴脚本</a>后<br>
-<a href="https://github.com/isma123HH/bilibili_live-assistant/raw/main/build/bili_live_assistant.user.js">点我安装脚本</a> 或者前往releases自行下载导入油猴
-<br>
-## 功能列表 最后更新与2022/5/28
->小功能菜单 #使用方法:右键直播播放器即可找到本菜单
->>获取m3u8直播流(获取格式为.m3u8格式的直播流链接)<br>
->>获取flv直播流(获取格式为.flv格式的直播流链接<br>
->>获取直播封面(获取当前直播间的直播封面)<br>
->>录制直播(录制当前直播) / 停止录制(停止录制直播)<br>
-<img src="assets/QQ截图20220528182944.png" />
-
->直播切片菜单(也就是直播回放流) # 选择之后会自动复制相应的回放流链接，可以粘贴至PotPlayer或其他在线网站观看
->>这里就不需要解释了吧<br>
->>300秒(5分钟)回放<br>
->>180秒(3分钟)回放<br>
->>60秒回放<br>
->>30秒回放<br>
->>15秒回放<br>
-<img src="assets/QQ截图20220518233312.png" />
-
-# 功能展示
-## 弹幕屏蔽
-<img src="assets/Desktop 2022.05.18 - 21.41.02.05.gif" alt="示例" /><br>
-当检测到弹幕包含屏蔽词，则将屏蔽词变成:□
-## 小功能菜单
-<img src="assets/Desktop 2022.05.18 - 21.41.02.05_1.gif" alt="示例" /><br>
-在播放器里右键即可查看本脚本提供的小功能，例如:<b>获取直播流</b>、<b>获取直播间封面</b>
-<br>
-## 直播切片菜单
-<img src="assets/Desktop 2022.05.18 - 21.41.02.05_2.gif" alt="示例" /><br>
-### 注意！这个功能并非在每一个直播间都生效！
-可以获得3分钟、1分钟、60秒、30秒、15秒的直播回放流，但是流可能`有点卡顿`
-## 直播流播放器
-<img src="assets/live_player_show.gif" alt="示例" /><br>
-复制直播流后懒得打开网站/软件观看?我们已经内置了播放器!只需要点击"插件菜单"按钮,再点击"直播流播放器"并粘贴直播流链接即可享受在线观看!<br>
-## 直播录制
-<img src="assets/live_rec_show.gif" alt="示例" /><br>
-您可以使用右键菜单的功能录制直播，我们已经提供了相对完善的功能支持。<br><b>需要注意的是，录制文件是.webm。并且如果您真的需要直播录制需求，我建议使用<a href=https://rec.danmuji.org/>B站录播姬</a>，因为js的稳定性太低了。</b>
-
-# 未来计划
-- [x] <del>在直播间页面弹出新窗口(插件设置那种的窗口)显示直播回放流。已放弃</del><br><b>已在脚本的2.5.3版本更新</b> 最后推荐一个在线网站http://tool.liumingye.cn/m3u8/index.php
-- [x] <del>将"m3u8播放器"使用的video.js更换为xgplayer.js。也就是<a href=https://v2.h5player.bytedance.com/>西瓜播放器</a>，但我正在忙另一个项目，大概会在3天后更新吧</del><br><b>已在2.6.0版本更新</b>
-- [x] <del>"插件设置"更名为"插件菜单"，以及"m3u8播放器"更名为"直播流播放器"。同时"直播流播放器"将<b>同时支持m3u8直播流和flv直播流的播放</b></del><br><b>已在2.6.3版本更新</b>
-- [x] <del>支持连接当前直播间的wss，api详见<a href=https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/live/message_stream.md>这里</a> <a href=https://github.com/SocialSisterYi/bilibili-API-collect/issues/360>还有这里</a></del><br><b>将在2.7.0版本更新</b> 如果"直播切片"代表脚本进入了一个新时代，那这次更新代表脚本又要进入一个新时代
-- [x] <del>新增一个"统计数据"的按钮，用来存放各种数据。</del> <br><b>将在2.7.0版本更新</b>
-- [x] <del>支持<a href=https://live.acfun.cn/>Acfun</a>的直播流获取，同样是右键播放器点击"获取直播流"。<br><b>将在...2.7.0版本更新，我写这个的时候忘了发布2.7.0，所以只能带着B站wss连接更新了</b></del> 
-- [x] <del>支持<a href=https://live.douyin.com/>抖音</a>的直播流获取，但不同的是需要在"手机观看"按钮旁边的<img src="assets/QQ截图20220530232439.png"/>里面找到直播流获取。</del><br><b>依然是在2.7.0版本更新</b>
-- [x] <del>在Acfun做一个和B站一样的"插件菜单"，但只有直播流播放器。</del><br><b>将在v2.7.3正式版更新</b>
-- [x] <del>支持直播录制，使用方法:右键播放器->小功能->录制直播 停止录制同理</del><br><b>将在v2.7.4更新</b>
-- [x] <del>增加直播录制时间展示，以及在播放器里增加一个显目的提示</del><br><b>将在v2.7.5更新</b>  
-- [x] <del>修复直播录制的bug，并且录制文件会用xgplayer显示。</del><br><b>将在v2.7.5更新</b>
-- [x] <del>特殊直播间（url里有blackboard）会导致一些无法预料到的问题，目前的修复方法就是：跳转至/blanc/房间号 即可回到一个正常的页面</del><br><b>在v2.7.5更新</b>
-- [ ] 陆续支持Acfun、抖音、虎牙、斗鱼等等直播平台
-- [ ] 考虑更换"直播切片"菜单的接口。
-
-# 目前的问题
-- [ ] 脚本加载成功后会有提示，可能会在导致提示"恭喜主播登上热门榜"的窗口里仍然显示一次提示(该窗口太小会导致排版错乱，极其影响观看体验)
-- [x] <del>切换清晰度会导致无法加载播放器，原因是切换清晰度后video标签的id会变，打开播放器需要先将原来的播放器静音。而id只会获取一次</del><br><b>已在2.6.0版本解决</b>
-- [ ] 在已确认可用的直播间通过"直播切片"菜单获取到的直播回放流可能无法使用，如果您也出现了这种问题，请向我反馈！
-- [x] <del>在某些特殊的直播间（有特殊活动的直播间），会无法获取"直播切片"菜单内的任何切片链接，目前我只遇到了这个问题。</del><br><b>在2.7.0版本解决了</b>
-- [ ] 依然是某些特殊的直播间，无法获取到uid，就会导致例如"检测弹幕是否发送成功"这个功能无法使用
-- [x] <del>根据原来的方法，直播录制文件需要在加载完毕后才可下载。现在我们采用了xgplayer，(大概)可以在没有加载完毕时下载</del><br><b>已修复，在2.7.5解决了，如果有问题请提Issues</b>
-- [x] <del>在B站2022/7/1对直播页面进行更新后，本脚本也在2022/7/4日更新了2.7.6版本，但由于更新，导致其他发送特殊表情弹幕，会无法附加时间到那条弹幕下。推测是由于需要加载资源导致?</del><br><b>在2.7.7版本解决</b>
-
-# 更新列表
-<ul>
-<li>2022/5/21 22:47 更新脚本至2.5.3。更新内容：在"插件设置"菜单内新增了"m3u8播放器"，不需要打开其他网页即可观看直播流链接！以及删除了"删除进入直播间提示"功能</li>
-<li>2022/5/21 23:37 更新脚本至2.5.4。更新内容：优化了一些代码，以及删除了"删除进入直播间提示"功能</li>
-<li>2022/5/24 21:13 更新脚本至2.6.0。更新内容："m3u8播放器"原先使用video.js，在本次更新将使用<a href=https://v2.h5player.bytedance.com/>xgplayer</a>(西瓜播放器)</li>
-<li>2022/5/28 18:25 更新脚本至2.6.3。更新内容：将"插件设置"改名为"插件菜单"。"m3u8播放器"改名为"直播流播放器"，以及同时支持了flv和m3u8直播流链接的播放。并修复了在某些特殊的直播间不会启用脚本的错误。<del>（但仍然无法获取直播切片 但在2.7.0版本解决了）</del></li>
-<li>2022/5/31 14:53 更新脚本至2.7.0。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
-<li>2022/6/3 21:25 更新脚本至2.7.3。更新内容：请前往<a href=https://github.com/isma123HH/bilibili_live-assistant/releases>release</a>查看</li>
-<li>2022/6/5 11:07 更新脚本至2.7.4。更新内容：添加了直播录制(bilibili)</li>
-<li>2022/6/10 23:53 更新脚本至2.7.5。更新内容：添加了直播录制(acfun)；现在直播录制后会使用xgplayer打开，而不是跳转到blob。因为blob需要在完整的看完之后才能下载视频。(bilibili以及acfun)</li>
-<li>2022/7/4 00:08 更新脚本至2.7.6。更新内容：更新了打开super chat可以点击目标用户的用户名跳转到他的个人主页，修复了弹幕发送时间显示</li>
-<b>更多更新信息请<a href="https://greasyfork.org/zh-CN/scripts/445172-%E7%9B%B4%E6%92%AD%E5%B0%8F%E5%B7%A5%E5%85%B7/versions">点击这里</a>或者<a href="https://github.com/isma123HH/bilibili_live-assistant/releases">这里</a>查看</b>
-</ul>
+<h2>安装<h2>
+<a href="https://github.com/isma123HH/bilibili_live-assistant/raw/main/build/bili_live_assistant.user.js">点我安装脚本</a>
+<a href="https://greasyfork.org/zh-CN/scripts/445172-%E7%9B%B4%E6%92%AD%E5%B0%8F%E5%B7%A5%E5%85%B7">Greasy Frok页面</a>
+<h2>更多内容正在施工中...</h2>
